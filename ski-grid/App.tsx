@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { AppState, GeneratedImage, ProgressState } from './types';
 import { UI_MESSAGES, SKI_PROMPTS } from './constants';
 import { generateSkiImage } from './services/geminiService';
@@ -9,20 +9,20 @@ const App: React.FC = () => {
   const [sourceData, setSourceData] = useState<{ base64: string; mimeType: string } | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [progress, setProgress] = useState<ProgressState>({ current: 0, total: 9, message: '' });
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ code: string; message: string } | null>(null);
   
-  // 使用 ref 来控制异步循环的流向
   const isPausedRef = useRef(false);
   const stopSignalRef = useRef(false);
   const currentIndexRef = useRef(0);
-  // Fix: Declare the missing fileInputRef to allow clearing and referencing the input element
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleOpenConfig = async () => {
     const aistudio = (window as any).aistudio;
     if (aistudio && aistudio.openSelectKey) {
       await aistudio.openSelectKey();
+      // 假设用户操作后 Key 已更新，重置错误状态
       setError(null);
+      if (state === AppState.ERROR) setState(AppState.IDLE);
     }
   };
 
@@ -32,10 +32,7 @@ const App: React.FC = () => {
       reader.readAsDataURL(file);
       reader.onload = () => {
         const res = reader.result as string;
-        resolve({
-          base64: res.split(',')[1],
-          mimeType: file.type || 'image/jpeg'
-        });
+        resolve({ base64: res.split(',')[1], mimeType: file.type || 'image/jpeg' });
       };
       reader.onerror = reject;
     });
@@ -49,13 +46,12 @@ const App: React.FC = () => {
       setState(AppState.UPLOADING);
       const data = await fileToData(file);
       setSourceData(data);
-      // 重置控制信号
       isPausedRef.current = false;
       stopSignalRef.current = false;
       currentIndexRef.current = 0;
       startGeneration(data.base64, data.mimeType, 0, []);
     } catch (err) {
-      setError("图片读取失败，请确保上传的是图片格式。");
+      setError({ code: 'FILE_ERROR', message: "图片读取失败，请重试。" });
       setState(AppState.ERROR);
     }
   };
@@ -71,10 +67,7 @@ const App: React.FC = () => {
     const results = [...existingResults];
 
     for (let i = startIndex; i < total; i++) {
-      // 检查是否收到了停止信号
       if (stopSignalRef.current) return;
-
-      // 检查是否暂停
       if (isPausedRef.current) {
         currentIndexRef.current = i;
         setState(AppState.PAUSED);
@@ -89,25 +82,29 @@ const App: React.FC = () => {
         });
         
         const imageUrl = await generateSkiImage(base64, mimeType, i);
-        const newImg = { id: `img-${i}`, url: imageUrl, prompt: SKI_PROMPTS[i] };
-        results.push(newImg);
-        
+        results.push({ id: `img-${i}`, url: imageUrl, prompt: SKI_PROMPTS[i] });
         setGeneratedImages([...results]);
       } catch (err: any) {
-        console.error("生成中断:", i, err);
-        if (results.length === 0) {
-          setError(err.message);
+        if (err.message === 'INVALID_KEY' || err.message === 'MISSING_KEY') {
+          setError({ code: 'AUTH_ERROR', message: "API 密钥无效或未配置。请点击下方按钮重新授权。" });
           setState(AppState.ERROR);
           return;
         }
-        // 如果已经有成功的，可以选择继续或跳过（这里简单处理为报错）
+        
+        // 其他非致命错误尝试继续（或在此可添加重试逻辑）
+        console.error("Single generation error:", err);
+        if (results.length === 0 && i === 0) {
+          setError({ code: 'GEN_ERROR', message: err.message });
+          setState(AppState.ERROR);
+          return;
+        }
       }
     }
 
     if (results.length > 0) {
       setState(AppState.COMPLETED);
     } else {
-      setError("生成失败，可能受限于图片合规性或 API 配额。");
+      setError({ code: 'GEN_ERROR', message: "生成失败，请检查网络或更换照片。" });
       setState(AppState.ERROR);
     }
   };
@@ -115,27 +112,12 @@ const App: React.FC = () => {
   const togglePause = () => {
     if (state === AppState.GENERATING) {
       isPausedRef.current = true;
-      // 注意：由于正在进行的请求无法立即撤回，UI 会在当前请求完成后进入 PAUSED 状态
     } else if (state === AppState.PAUSED) {
       isPausedRef.current = false;
       if (sourceData) {
         startGeneration(sourceData.base64, sourceData.mimeType, currentIndexRef.current, generatedImages);
       }
     }
-  };
-
-  const cancelGeneration = () => {
-    stopSignalRef.current = true;
-    reset();
-  };
-
-  const saveToGallery = (url: string, id: string) => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `ski_vibe_${id}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   const reset = () => {
@@ -146,8 +128,16 @@ const App: React.FC = () => {
     isPausedRef.current = false;
     stopSignalRef.current = false;
     currentIndexRef.current = 0;
-    // Fix: Reference the declared fileInputRef to clear the input value
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const saveToGallery = (url: string, id: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ski_${id}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -160,7 +150,7 @@ const App: React.FC = () => {
           <h1 className="text-lg font-bold text-slate-800 tracking-tight">AI滑雪实验室</h1>
         </div>
         {state !== AppState.IDLE && (
-          <button onClick={reset} className="text-blue-600 font-bold text-sm">首页</button>
+          <button onClick={reset} className="text-blue-600 font-bold text-sm">返回首页</button>
         )}
       </header>
 
@@ -182,14 +172,7 @@ const App: React.FC = () => {
               </div>
               <label className="w-full py-5 bg-blue-600 text-white rounded-2xl font-bold cursor-pointer hover:bg-blue-700 active:scale-[0.98] transition-all shadow-xl shadow-blue-200 block text-center">
                 立即开始制作
-                <input 
-                  type="file" 
-                  // Fix: Attach the declared fileInputRef to the input element
-                  ref={fileInputRef}
-                  className="hidden" 
-                  accept="image/*" 
-                  onChange={handleFileUpload} 
-                />
+                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
               </label>
             </div>
           </div>
@@ -210,31 +193,12 @@ const App: React.FC = () => {
                 {state === AppState.PAUSED ? '生成已暂停' : progress.message}
               </p>
               <div className="flex space-x-3 justify-center">
-                {state === AppState.GENERATING && (
-                  <button 
-                    onClick={togglePause}
-                    className="px-6 py-2 bg-slate-100 text-slate-600 rounded-full text-sm font-bold flex items-center space-x-2"
-                  >
-                    <i className="fas fa-pause"></i>
-                    <span>暂停生成</span>
-                  </button>
-                )}
+                <button onClick={togglePause} className="px-6 py-2 bg-slate-100 text-slate-600 rounded-full text-sm font-bold flex items-center space-x-2">
+                  <i className={`fas ${state === AppState.PAUSED ? 'fa-play' : 'fa-pause'}`}></i>
+                  <span>{state === AppState.PAUSED ? '继续生成' : '暂停生成'}</span>
+                </button>
                 {state === AppState.PAUSED && (
-                  <>
-                    <button 
-                      onClick={togglePause}
-                      className="px-6 py-2 bg-blue-600 text-white rounded-full text-sm font-bold flex items-center space-x-2 shadow-lg shadow-blue-100"
-                    >
-                      <i className="fas fa-play"></i>
-                      <span>继续生成</span>
-                    </button>
-                    <button 
-                      onClick={cancelGeneration}
-                      className="px-6 py-2 bg-white text-red-500 border border-red-50 rounded-full text-sm font-bold"
-                    >
-                      放弃
-                    </button>
-                  </>
+                  <button onClick={reset} className="px-6 py-2 bg-white text-red-500 border border-red-50 rounded-full text-sm font-bold">放弃</button>
                 )}
               </div>
             </div>
@@ -262,52 +226,41 @@ const App: React.FC = () => {
               </div>
               <h2 className="text-2xl font-black text-slate-900">属于您的滑雪大片</h2>
             </div>
-
             <div className="grid grid-cols-3 gap-1.5 p-2 bg-white rounded-[2rem] shadow-2xl border border-white overflow-hidden">
               {generatedImages.map((img) => (
-                <div key={img.id} className="aspect-square relative group active:scale-95 transition-transform">
+                <div key={img.id} className="aspect-square relative active:scale-95 transition-transform">
                   <img src={img.url} className="w-full h-full object-cover rounded-xl" alt="skiing" />
-                  <button 
-                    onClick={() => saveToGallery(img.url, img.id)}
-                    className="absolute bottom-1.5 right-1.5 w-8 h-8 bg-white/90 text-blue-600 rounded-full flex items-center justify-center text-xs shadow-lg backdrop-blur-sm"
-                  >
+                  <button onClick={() => saveToGallery(img.url, img.id)} className="absolute bottom-1.5 right-1.5 w-8 h-8 bg-white/90 text-blue-600 rounded-full flex items-center justify-center text-xs shadow-lg backdrop-blur-sm">
                     <i className="fas fa-download"></i>
                   </button>
                 </div>
               ))}
             </div>
-
-            <div className="flex flex-col space-y-4">
-              <button 
-                onClick={() => generatedImages.forEach(img => saveToGallery(img.url, img.id))}
-                className="w-full py-5 bg-blue-600 text-white rounded-2xl font-bold shadow-xl shadow-blue-200 flex items-center justify-center space-x-3"
-              >
-                <i className="fas fa-th"></i>
-                <span>保存全部照片</span>
-              </button>
-              <button onClick={reset} className="w-full py-5 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold">
-                重新上传
-              </button>
-            </div>
+            <button onClick={() => generatedImages.forEach(img => saveToGallery(img.url, img.id))} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-bold shadow-xl shadow-blue-200 flex items-center justify-center space-x-3">
+              <i className="fas fa-th"></i>
+              <span>保存全部九宫格图片</span>
+            </button>
           </div>
         )}
 
         {state === AppState.ERROR && (
-          <div className="text-center space-y-8 pt-10">
+          <div className="text-center space-y-8 pt-10 animate-fade-in">
             <div className="w-24 h-24 bg-red-50 text-red-500 rounded-full flex items-center justify-center text-4xl mx-auto shadow-inner">
-              <i className="fas fa-exclamation-triangle"></i>
+              <i className="fas fa-key"></i>
             </div>
             <div className="space-y-4 px-2">
-              <h3 className="text-xl font-bold text-slate-800">生成中断</h3>
+              <h3 className="text-xl font-bold text-slate-800">密钥授权问题</h3>
               <div className="p-5 bg-white rounded-2xl border border-red-100 shadow-sm">
-                <p className="text-sm text-red-600 leading-relaxed font-mono break-all">{error}</p>
+                <p className="text-sm text-red-600 leading-relaxed">{error?.message}</p>
               </div>
               <div className="flex flex-col space-y-3">
-                <button onClick={reset} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg">
-                  返回首页重试
-                </button>
-                <button onClick={handleOpenConfig} className="text-xs text-slate-400 hover:text-slate-600">
-                  管理员：手动配置 API Key
+                {error?.code === 'AUTH_ERROR' && (
+                  <button onClick={handleOpenConfig} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-100">
+                    点击此处配置 API Key
+                  </button>
+                )}
+                <button onClick={reset} className="w-full py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">
+                  放弃并返回
                 </button>
               </div>
             </div>
@@ -316,7 +269,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="mt-auto py-10 text-center px-6">
-        <p className="text-slate-300 text-[10px] tracking-[0.5em] font-medium uppercase mb-4">AI Skiing Vacation Studio</p>
+        <p className="text-slate-300 text-[10px] tracking-[0.5em] font-medium uppercase">AI Skiing Vacation Studio</p>
       </footer>
 
       <style dangerouslySetInnerHTML={{ __html: `
