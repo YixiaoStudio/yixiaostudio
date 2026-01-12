@@ -1,0 +1,7 @@
+{
+  "name": "AI滑雪大片生成器",
+  "description": "上传您的照片，AI将为您生成9张在世界顶级滑雪胜地度假的精美照片，助您轻松刷爆朋友圈。",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
