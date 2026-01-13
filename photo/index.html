@@ -85,7 +85,7 @@
             background: #88b1ff;
             cursor: not-allowed;
         }
-        /* 加载提示 */
+        /* 加载提示 + 进度条容器 */
         #loading {
             display: none;
             color: #666;
@@ -93,17 +93,34 @@
             font-size: 16px;
             text-align: center;
         }
-        /* 单张图片容器（3:4比例，适配屏幕） */
+        /* 进度条样式 */
+        .progress-container {
+            width: 100%;
+            max-width: 600px;
+            height: 8px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            margin: 10px auto;
+            overflow: hidden;
+            display: none;
+        }
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: #165DFF;
+            border-radius: 4px;
+            transition: width 0.3s ease; /* 平滑过渡 */
+        }
+        /* 单张图片容器（3:4比例） */
         .single-image-container {
             margin-top: 20px;
             width: 100%;
-            max-width: 600px; /* 限制最大宽度，避免大屏拉伸 */
+            max-width: 600px;
             margin-left: auto;
-            margin-right: auto; /* 居中显示 */
+            margin-right: auto;
             position: relative;
             border-radius: 6px;
             overflow: hidden;
-            /* 核心：3:4比例（padding-top = 高度/宽度 * 100% = 4/3 * 100% ≈ 133.33%） */
             padding-top: 133.33%; 
             background: #f9f9f9;
             border: 1px solid #eee;
@@ -115,7 +132,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            object-fit: contain; /* 保持图片完整，不裁剪 */
+            object-fit: contain;
             transition: transform 0.2s ease;
         }
         .single-img:hover {
@@ -148,22 +165,22 @@
             <button class="mode-btn active" onclick="switchMode('img2img')">图生图</button>
         </div>
         
-        <!-- 移除提示词输入框 -->
-        
         <!-- 图生图专属：文件上传区域 -->
         <div class="upload-area" id="uploadArea">
             <button class="upload-btn" onclick="document.getElementById('fileInput').click()">选择本地图片</button>
             <input type="file" id="fileInput" accept="image/jpeg,image/png,image/jpg" />
             <div class="upload-tip">支持格式：jpg/png | 建议大小：≤10MB</div>
-            <!-- 图片预览 -->
             <img id="previewImg" class="preview-img" alt="图片预览" />
         </div>
         
         <!-- 生成按钮 -->
         <button id="genBtn" onclick="generateSingleImage()">生成写真照</button>
         
-        <!-- 加载提示 -->
+        <!-- 加载提示 + 进度条 -->
         <div id="loading">准备生成...</div>
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
         
         <!-- 单张图片展示容器 -->
         <div class="single-image-container" id="resultImageContainer"></div>
@@ -173,51 +190,49 @@
     </div>
 
     <script>
-        // 全局变量：当前模式、上传后的图片URL
+        // 全局变量
         let currentMode = 'img2img';
         let uploadedImageUrl = '';
-        // 后端接口地址（替换为你的火山引擎API网关公网地址）
+        let progressInterval = null; // 进度条定时器
+        // 后端接口地址
         const VOLC_API_BASE = 'https://sd5j17d5mg7k3v1e7vu60.apigateway-cn-beijing.volceapi.com'; 
         const UPLOAD_API = VOLC_API_BASE + '/api/upload-to-tos';
         const GENERATE_API = VOLC_API_BASE + '/api/generate-image';
 
-        // 1. 切换模式（仅保留图生图逻辑）
+        // 1. 切换模式
         function switchMode(mode) {
             currentMode = mode;
-            // 更新按钮样式
             document.querySelectorAll('.mode-btn').forEach(btn => {
                 btn.classList.remove('active');
                 if (btn.onclick.toString().includes(mode)) {
                     btn.classList.add('active');
                 }
             });
-            // 显示文件上传区域（固定显示）
             document.getElementById('uploadArea').style.display = 'block';
-            // 重置状态
+            // 重置状态（包括进度条）
+            resetProgress();
             uploadedImageUrl = '';
             document.getElementById('previewImg').style.display = 'none';
             document.getElementById('resultImageContainer').innerHTML = '';
             document.getElementById('resultTip').textContent = '';
         }
 
-        // 2. 监听文件选择事件（预览+上传）
+        // 2. 监听文件选择
         document.getElementById('fileInput').addEventListener('change', async function(e) {
             const file = e.target.files[0];
             if (!file) return;
 
-            // 第一步：显示图片预览
+            // 预览图片
             const previewImg = document.getElementById('previewImg');
             previewImg.src = URL.createObjectURL(file);
             previewImg.style.display = 'block';
 
-            // 第二步：将文件转为Base64
+            // 转Base64并上传
             const base64Str = await fileToBase64(file);
-            
-            // 第三步：上传到后端TOS接口，获取公网URL
             uploadImageToTOS(base64Str);
         });
 
-        // 辅助函数：文件转Base64
+        // 辅助：文件转Base64
         function fileToBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -227,11 +242,14 @@
             });
         }
 
-        // 3. 上传Base64图片到后端TOS接口
+        // 3. 上传图片到TOS
         async function uploadImageToTOS(base64Str) {
             const loading = document.getElementById('loading');
             loading.style.display = 'block';
             loading.textContent = '正在上传图片到服务器...';
+            
+            // 上传阶段也显示进度条（0-50%）
+            startProgress(0, 50, '上传中...');
 
             try {
                 const res = await fetch(UPLOAD_API, {
@@ -242,51 +260,57 @@
                 const data = await res.json();
 
                 if (data.code === 0) {
-                    // 上传成功，保存公网URL
                     uploadedImageUrl = data.data.imageUrl;
                     loading.textContent = '图片上传成功！准备生成写真...';
+                    updateProgress(50); // 上传完成，进度到50%
                 } else {
                     alert('图片上传失败：' + data.message);
                     uploadedImageUrl = '';
                     loading.textContent = '图片上传失败';
+                    resetProgress();
                 }
             } catch (err) {
                 alert('上传异常：' + err.message);
                 uploadedImageUrl = '';
                 loading.textContent = '上传异常';
+                resetProgress();
             }
         }
 
-        // 4. 单次调用生成图片接口（移除prompt参数）
+        // 4. 调用生成接口
         async function callGenerateApi(imageUrl) {
-            try {
-                const res = await fetch(GENERATE_API, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        // 不再传prompt，后端使用默认值
-                        imageUrl: imageUrl
-                    })
-                });
-                const data = await res.json();
-                if (data.code !== 0) {
-                    throw new Error(data.message || '生成图片失败');
+            return new Promise(async (resolve, reject) => {
+                try {
+                    // 生成阶段进度条（50-90%）
+                    startProgress(50, 90, '生成写真中...');
+
+                    const res = await fetch(GENERATE_API, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ imageUrl: imageUrl })
+                    });
+                    const data = await res.json();
+
+                    if (data.code !== 0) {
+                        throw new Error(data.message || '生成图片失败');
+                    }
+                    // 生成完成，进度到100%
+                    updateProgress(100);
+                    resolve(data.data);
+                } catch (err) {
+                    reject(err);
                 }
-                return data.data; // 返回图片URL数组
-            } catch (err) {
-                throw err;
-            }
+            });
         }
 
-        // 5. 渲染单张图片
+        // 5. 渲染图片
         function renderSingleImage(url) {
             const container = document.getElementById('resultImageContainer');
-            container.innerHTML = ''; // 清空原有内容
+            container.innerHTML = '';
             const img = document.createElement('img');
             img.className = 'single-img';
             img.src = url;
             img.alt = '生成的写真照';
-            // 图片加载失败兜底
             img.onerror = function() {
                 this.classList.add('error');
                 this.src = '';
@@ -296,9 +320,9 @@
             container.appendChild(img);
         }
 
-        // 6. 核心：生成单张图片（移除prompt校验）
+        // 6. 核心：生成图片（含进度条逻辑）
         async function generateSingleImage() {
-            // 仅校验图片是否上传
+            // 校验图片
             if (currentMode === 'img2img' && !uploadedImageUrl) {
                 alert('请先选择并上传本地图片！');
                 return;
@@ -316,28 +340,84 @@
             resultTip.textContent = '';
 
             try {
-                // 生成图片
-                loading.textContent = '正在生成写真照...';
+                // 调用生成接口
                 const imageData = await callGenerateApi(uploadedImageUrl);
-                // 取第一张图渲染
+                // 渲染图片
                 renderSingleImage(imageData[0].url);
 
-                // 生成完成
+                // 完成状态
                 loading.style.display = 'none';
+                hideProgress();
                 resultTip.textContent = '✅ 写真照生成成功！（3:4比例适配屏幕）';
 
             } catch (err) {
-                // 错误处理
+                // 失败状态
                 loading.style.display = 'none';
+                resetProgress();
                 resultTip.textContent = `❌ 生成失败：${err.message}`;
                 alert(`生成失败：${err.message}`);
             } finally {
-                // 恢复按钮状态
                 genBtn.disabled = false;
             }
         }
 
-        // 初始化：默认显示图生图区域
+        // ========== 进度条核心函数 ==========
+        // 重置进度条
+        function resetProgress() {
+            clearInterval(progressInterval);
+            progressInterval = null;
+            const progressBar = document.getElementById('progressBar');
+            const progressContainer = document.getElementById('progressContainer');
+            progressBar.style.width = '0%';
+            progressContainer.style.display = 'none';
+        }
+
+        // 隐藏进度条
+        function hideProgress() {
+            clearInterval(progressInterval);
+            progressInterval = null;
+            document.getElementById('progressContainer').style.display = 'none';
+        }
+
+        // 更新进度条到指定百分比
+        function updateProgress(percent) {
+            const progressBar = document.getElementById('progressBar');
+            percent = Math.min(100, Math.max(0, percent)); // 限制0-100
+            progressBar.style.width = `${percent}%`;
+            // 100%后自动隐藏
+            if (percent === 100) {
+                setTimeout(hideProgress, 500);
+            }
+        }
+
+        // 启动进度条（从start到end，带提示文本）
+        function startProgress(startPercent, endPercent, text) {
+            // 清除原有定时器
+            clearInterval(progressInterval);
+            // 显示进度条容器
+            const progressContainer = document.getElementById('progressContainer');
+            const loading = document.getElementById('loading');
+            progressContainer.style.display = 'block';
+            loading.textContent = text;
+
+            // 设置初始进度
+            updateProgress(startPercent);
+            let currentPercent = startPercent;
+            // 计算每次增长的步长（总时长约等于生成耗时，这里设为15秒完成50-90%）
+            const step = (endPercent - startPercent) / 150; // 15秒 = 150次 * 100ms
+
+            // 启动定时器更新进度
+            progressInterval = setInterval(() => {
+                currentPercent += step;
+                if (currentPercent >= endPercent) {
+                    currentPercent = endPercent;
+                    clearInterval(progressInterval);
+                }
+                updateProgress(currentPercent);
+            }, 100);
+        }
+
+        // 初始化
         switchMode('img2img');
     </script>
 </body>
