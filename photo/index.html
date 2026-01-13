@@ -21,16 +21,6 @@
             margin: 20px 0;
             text-align: center;
         }
-        #prompt {
-            width: 100%;
-            height: 100px;
-            margin: 10px 0;
-            padding: 10px;
-            resize: vertical;
-            border: 1px solid #eee;
-            border-radius: 4px;
-            font-size: 14px;
-        }
         /* 模式切换按钮 */
         .mode-group {
             margin: 10px 0;
@@ -153,18 +143,14 @@
     <div class="container">
         <h2>seeDream4.5 上传图片生成写真照</h2>
         
-        <!-- 模式切换：文生图/图生图 -->
+        <!-- 模式切换：仅保留图生图 -->
         <div class="mode-group">
             <button class="mode-btn active" onclick="switchMode('img2img')">图生图</button>
         </div>
         
-        <!-- 提示词输入框 -->
-        <textarea 
-            id="prompt" 
-            placeholder="输入绘图描述词（例：参考这张图片，生成简约风格的户外运动品牌视觉设计，绿色主色调）">
-        </textarea>
+        <!-- 移除提示词输入框 -->
         
-        <!-- 图生图专属：文件上传区域（替代原来的URL输入） -->
+        <!-- 图生图专属：文件上传区域 -->
         <div class="upload-area" id="uploadArea">
             <button class="upload-btn" onclick="document.getElementById('fileInput').click()">选择本地图片</button>
             <input type="file" id="fileInput" accept="image/jpeg,image/png,image/jpg" />
@@ -173,13 +159,13 @@
             <img id="previewImg" class="preview-img" alt="图片预览" />
         </div>
         
-        <!-- 生成按钮：修改文字和点击事件 -->
-        <button id="genBtn" onclick="generateSingleImage()">生成图片（1张）</button>
+        <!-- 生成按钮 -->
+        <button id="genBtn" onclick="generateSingleImage()">生成写真照</button>
         
         <!-- 加载提示 -->
         <div id="loading">准备生成...</div>
         
-        <!-- 单张图片展示容器（替换原来的九宫格） -->
+        <!-- 单张图片展示容器 -->
         <div class="single-image-container" id="resultImageContainer"></div>
         
         <!-- 结果提示 -->
@@ -190,13 +176,12 @@
         // 全局变量：当前模式、上传后的图片URL
         let currentMode = 'img2img';
         let uploadedImageUrl = '';
-        // 后端接口地址（已替换为火山引擎API网关公网地址）
-        // ********** 重点：替换下面这行的地址为你的API网关公网地址 **********
-        const VOLC_API_BASE = 'https://sd5j17d5mg7k3v1e7vu60.apigateway-cn-beijing.volceapi.com'; // 示例：https://abc123.cn-beijing.volces.com
+        // 后端接口地址（替换为你的火山引擎API网关公网地址）
+        const VOLC_API_BASE = 'https://sd5j17d5mg7k3v1e7vu60.apigateway-cn-beijing.volceapi.com'; 
         const UPLOAD_API = VOLC_API_BASE + '/api/upload-to-tos';
         const GENERATE_API = VOLC_API_BASE + '/api/generate-image';
 
-        // 1. 切换模式（文生图/图生图）
+        // 1. 切换模式（仅保留图生图逻辑）
         function switchMode(mode) {
             currentMode = mode;
             // 更新按钮样式
@@ -206,8 +191,8 @@
                     btn.classList.add('active');
                 }
             });
-            // 显示/隐藏文件上传区域
-            document.getElementById('uploadArea').style.display = mode === 'img2img' ? 'block' : 'none';
+            // 显示文件上传区域（固定显示）
+            document.getElementById('uploadArea').style.display = 'block';
             // 重置状态
             uploadedImageUrl = '';
             document.getElementById('previewImg').style.display = 'none';
@@ -259,7 +244,7 @@
                 if (data.code === 0) {
                     // 上传成功，保存公网URL
                     uploadedImageUrl = data.data.imageUrl;
-                    loading.textContent = '图片上传成功！准备生成图片...';
+                    loading.textContent = '图片上传成功！准备生成写真...';
                 } else {
                     alert('图片上传失败：' + data.message);
                     uploadedImageUrl = '';
@@ -272,15 +257,15 @@
             }
         }
 
-        // 4. 单次调用生成图片接口
-        async function callGenerateApi(prompt, imageUrl) {
+        // 4. 单次调用生成图片接口（移除prompt参数）
+        async function callGenerateApi(imageUrl) {
             try {
                 const res = await fetch(GENERATE_API, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        prompt: prompt,
-                        ...(currentMode === 'img2img' && { imageUrl: imageUrl })
+                        // 不再传prompt，后端使用默认值
+                        imageUrl: imageUrl
                     })
                 });
                 const data = await res.json();
@@ -300,7 +285,7 @@
             const img = document.createElement('img');
             img.className = 'single-img';
             img.src = url;
-            img.alt = '生成的图片';
+            img.alt = '生成的写真照';
             // 图片加载失败兜底
             img.onerror = function() {
                 this.classList.add('error');
@@ -311,15 +296,9 @@
             container.appendChild(img);
         }
 
-        // 6. 核心：生成单张图片（替换原来的九宫格生成逻辑）
+        // 6. 核心：生成单张图片（移除prompt校验）
         async function generateSingleImage() {
-            // 基础校验
-            const prompt = document.getElementById('prompt').value.trim();
-            if (!prompt) {
-                alert('请输入绘图描述词！');
-                return;
-            }
-            // 图生图模式必须先上传图片
+            // 仅校验图片是否上传
             if (currentMode === 'img2img' && !uploadedImageUrl) {
                 alert('请先选择并上传本地图片！');
                 return;
@@ -337,15 +316,15 @@
             resultTip.textContent = '';
 
             try {
-                // 只生成1张图
-                loading.textContent = '正在生成图片...';
-                const imageData = await callGenerateApi(prompt, uploadedImageUrl);
+                // 生成图片
+                loading.textContent = '正在生成写真照...';
+                const imageData = await callGenerateApi(uploadedImageUrl);
                 // 取第一张图渲染
                 renderSingleImage(imageData[0].url);
 
                 // 生成完成
                 loading.style.display = 'none';
-                resultTip.textContent = '✅ 生成成功！（3:4比例适配屏幕）';
+                resultTip.textContent = '✅ 写真照生成成功！（3:4比例适配屏幕）';
 
             } catch (err) {
                 // 错误处理
