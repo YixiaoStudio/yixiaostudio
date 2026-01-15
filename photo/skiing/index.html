@@ -1146,7 +1146,10 @@
 
             // 7. 保存到本地并实时渲染
             saveHistoryToLocal(history);
-            renderHistoryList();
+            // 延迟渲染，确保DOM元素已就绪
+            setTimeout(() => {
+                renderHistoryList();
+            }, 50);
 
             // 8. 调试日志
             const validCount = currentRecord.images.filter(url => url).length;
@@ -1157,12 +1160,28 @@
          * 渲染历史记录列表
          */
         function renderHistoryList() {
+            // 核心修复：先检查DOM元素是否存在
             const historyList = document.getElementById('historyList');
-            const historyEmpty = document.getElementById('historyEmpty');
+            if (!historyList) {
+                console.error('历史记录容器不存在！');
+                return;
+            }
+            
+            // 先获取空状态元素（避免重复创建）
+            let historyEmpty = document.getElementById('historyEmpty');
+            if (!historyEmpty) {
+                historyEmpty = document.createElement('div');
+                historyEmpty.id = 'historyEmpty';
+                historyEmpty.className = 'history-empty';
+                historyEmpty.textContent = '暂无生成记录';
+            }
+            
             const history = loadHistoryFromLocal();
 
-            // 清空列表
-            historyList.innerHTML = '';
+            // 安全清空列表（避免remove null）
+            while (historyList.firstChild) {
+                historyList.removeChild(historyList.firstChild);
+            }
 
             if (history.length === 0) {
                 // 显示空状态
@@ -1171,9 +1190,6 @@
                 return;
             }
 
-            // 隐藏空状态
-            historyEmpty.remove();
-            
             // 渲染每条历史记录
             history.forEach((item, index) => {
                 const historyItem = document.createElement('div');
@@ -1213,6 +1229,8 @@
         function toggleHistoryList() {
             const historyList = document.getElementById('historyList');
             const showHistoryBtn = document.getElementById('showHistoryBtn');
+            
+            if (!historyList || !showHistoryBtn) return;
             
             if (historyList.style.display === 'none') {
                 historyList.style.display = 'block';
