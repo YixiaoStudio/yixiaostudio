@@ -166,6 +166,39 @@
             border-radius: 4px;
             cursor: pointer;
         }
+        /* ========== 新增：保存按钮样式 ========== */
+        #saveAllBtn {
+            padding: 12px 24px;
+            background: #00B42A;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            display: none;
+        }
+        #saveAllBtn:disabled {
+            background: #86e89c;
+            cursor: not-allowed;
+        }
+        .save-single-btn {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            background: rgba(22, 93, 255, 0.8);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            display: none;
+            z-index: 10;
+        }
+        .grid-item:hover .save-single-btn {
+            display: block;
+        }
+        /* ========== 原有样式结束 ========== */
         #loading {
             display: none;
             color: #666;
@@ -222,7 +255,7 @@
 
         <!-- ========== 新增：积分&邀请码区域 ========== -->
         <div class="points-container">
-            <div class="points-info">当前积分：<span id="currentPoints">0</span>（生成一次九宫格图消耗1积分）</div>
+            <div class="points-info">当前积分：<span id="currentPoints">0</span>（生成一次消耗1积分）</div>
             <div class="invite-code-box">
                 <input type="text" id="inviteCodeInput" placeholder="输入令牌兑换积分">
                 <button id="exchangeBtn" onclick="exchangeInviteCode()">兑换积分</button>
@@ -253,10 +286,11 @@
             <img id="previewImg" class="preview-img" alt="图片预览" />
         </div>
         
-        <!-- 原有按钮组 -->
+        <!-- 原有按钮组 - 新增保存全部按钮 -->
         <div class="btn-group">
             <button id="genGridBtn" onclick="startGridGeneration()" disabled>生成九宫格写真</button>
             <button id="pauseBtn" onclick="togglePause()">暂停生成</button>
+            <button id="saveAllBtn" onclick="saveAllImages()" disabled>保存所有图片</button>
             <button id="genSingleBtn" onclick="generateSingleImage()"></button>
         </div>
         
@@ -277,6 +311,8 @@
         let isPaused = false;            
         let generationTimer = null;      
         const STORAGE_KEY = 'photoGeneratorTags';
+        // 新增：存储生成的图片URL
+        let generatedImageUrls = [];
         // 后端接口地址
         const VOLC_API_BASE = 'https://sd5j17d5mg7k3v1e7vu60.apigateway-cn-beijing.volceapi.com'; 
         const UPLOAD_API = VOLC_API_BASE + '/api/upload-to-tos';
@@ -288,6 +324,7 @@
             tokens: {
                 'YX5': 5,
                 'YX10': 10,
+                'YX2': 2,
                 'YX20': 20
             },
             usedTokensKey: 'usedInviteCodes', // 本地存储已使用令牌的Key
@@ -453,6 +490,12 @@
         function initGridContainer() {
             const gridContainer = document.getElementById('gridContainer');
             gridContainer.innerHTML = '';
+            // 重置生成的图片URL数组
+            generatedImageUrls = [];
+            // 禁用保存全部按钮
+            document.getElementById('saveAllBtn').disabled = true;
+            document.getElementById('saveAllBtn').style.display = 'none';
+            
             for (let i = 0; i < 9; i++) {
                 const gridItem = document.createElement('div');
                 gridItem.className = 'grid-item';
@@ -596,6 +639,9 @@
                     document.getElementById('loading').textContent = '✅ 九宫格生成完成！';
                     document.getElementById('progressTip').textContent = '所有图片生成完成，点击图片查看大图';
                     document.getElementById('pauseBtn').style.display = 'none';
+                    // 新增：显示并启用保存全部按钮
+                    document.getElementById('saveAllBtn').style.display = 'block';
+                    document.getElementById('saveAllBtn').disabled = false;
                     isGridGenerating = false;
                     isPaused = false;
                     addDebugLog('九宫格生成完成');
@@ -628,6 +674,8 @@
                 const imageUrl = await callGenerateApi(currentTag, uploadedImageUrl);
                 
                 renderGridImage(currentGridIndex, imageUrl);
+                // 新增：保存生成的图片URL
+                generatedImageUrls[currentGridIndex] = imageUrl;
                 addDebugLog(`第${currentGridIndex+1}张生成成功，URL：${imageUrl}`);
 
                 currentGridIndex++;
@@ -638,6 +686,8 @@
 
             } catch (err) {
                 renderGridImage(currentGridIndex, null, err.message);
+                // 新增：失败时记录null
+                generatedImageUrls[currentGridIndex] = null;
                 addDebugLog(`第${currentGridIndex+1}张生成失败：${err.message}`);
                 
                 currentGridIndex++;
@@ -748,13 +798,159 @@
                     this.textContent = '图片加载失败';
                     addDebugLog(`第${index+1}张图片加载失败`);
                 };
+                
+                // 新增：添加单张保存按钮
+                const saveBtn = document.createElement('button');
+                saveBtn.className = 'save-single-btn';
+                saveBtn.textContent = '保存图片';
+                saveBtn.onclick = function(e) {
+                    e.stopPropagation();
+                    saveSingleImage(index, imageUrl);
+                };
+                
+                gridItem.appendChild(img);
+                gridItem.appendChild(saveBtn);
             } else {
                 img.classList.add('error');
                 img.src = '';
                 img.textContent = errorMsg || '生成失败';
+                gridItem.appendChild(img);
             }
+        }
+
+        // ========== 修复CORS问题：重写保存图片核心功能 ==========
+        /**
+         * 保存单张图片（绕过CORS限制）
+         * @param {number} index 图片索引
+         * @param {string} imageUrl 图片URL
+         */
+        function saveSingleImage(index, imageUrl) {
+            try {
+                // 禁用按钮防止重复点击
+                const saveBtn = document.querySelector(`#gridItem-${index} .save-single-btn`);
+                if (saveBtn) {
+                    saveBtn.disabled = true;
+                    saveBtn.textContent = '保存中...';
+                }
+                
+                // 方案1：直接创建下载链接（不通过fetch，避免CORS）
+                const a = document.createElement('a');
+                a.href = imageUrl;
+                a.download = `雪景九宫格_${index+1}.jpg`; // 设置文件名
+                a.target = '_blank'; // 新开窗口下载
+                
+                // 添加到文档并触发点击
+                document.body.appendChild(a);
+                const clickEvent = new MouseEvent('click', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true
+                });
+                a.dispatchEvent(clickEvent);
+                
+                // 清理资源
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    // 恢复按钮状态
+                    if (saveBtn) {
+                        saveBtn.disabled = false;
+                        saveBtn.textContent = '保存图片';
+                    }
+                }, 100);
+                
+                addDebugLog(`第${index+1}张图片保存请求已发送`);
+                alert(`第${index+1}张图片开始下载！\n如果没有自动下载，请手动右键图片选择"图片另存为"`);
+                
+            } catch (err) {
+                addDebugLog(`保存第${index+1}张图片失败：${err.message}`);
+                alert(`保存失败：${err.message}\n请尝试右键图片选择"图片另存为"`);
+                
+                // 恢复按钮状态
+                const saveBtn = document.querySelector(`#gridItem-${index} .save-single-btn`);
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = '保存图片';
+                }
+            }
+        }
+
+        /**
+         * 保存所有图片（绕过CORS限制）
+         */
+        function saveAllImages() {
+            const saveAllBtn = document.getElementById('saveAllBtn');
+            saveAllBtn.disabled = true;
+            saveAllBtn.textContent = '保存中...';
             
-            gridItem.appendChild(img);
+            try {
+                // 检查是否有生成的图片
+                const validImages = generatedImageUrls.filter(url => url);
+                if (validImages.length === 0) {
+                    alert('没有可保存的图片！');
+                    saveAllBtn.disabled = false;
+                    saveAllBtn.textContent = '保存所有图片';
+                    return;
+                }
+                
+                // 逐个创建下载链接
+                let successCount = 0;
+                let failCount = 0;
+                
+                for (let i = 0; i < generatedImageUrls.length; i++) {
+                    const imageUrl = generatedImageUrls[i];
+                    if (!imageUrl) {
+                        failCount++;
+                        addDebugLog(`第${i+1}张图片无有效URL，跳过保存`);
+                        continue;
+                    }
+                    
+                    try {
+                        const a = document.createElement('a');
+                        a.href = imageUrl;
+                        a.download = `雪景九宫格_${i+1}.jpg`;
+                        a.target = '_blank';
+                        
+                        document.body.appendChild(a);
+                        const clickEvent = new MouseEvent('click', {
+                            view: window,
+                            bubbles: true,
+                            cancelable: true
+                        });
+                        a.dispatchEvent(clickEvent);
+                        
+                        setTimeout(() => {
+                            document.body.removeChild(a);
+                        }, 1000);
+                        
+                        successCount++;
+                        addDebugLog(`批量保存：第${i+1}张图片下载请求已发送`);
+                        
+                    } catch (err) {
+                        failCount++;
+                        addDebugLog(`批量保存：第${i+1}张图片保存失败 - ${err.message}`);
+                    }
+                }
+                
+                // 显示保存结果
+                const message = `批量保存请求已发送！
+成功发起：${successCount} 张
+失败/跳过：${failCount} 张
+
+注意：
+1. 浏览器可能会弹出下载确认，请允许下载
+2. 如果部分图片未下载，请手动右键图片选择"图片另存为"
+3. 请检查您的下载文件夹`;
+                alert(message);
+                addDebugLog(`批量保存完成：成功发起${successCount}张，失败${failCount}张`);
+                
+            } catch (err) {
+                addDebugLog(`批量保存异常：${err.message}`);
+                alert(`批量保存失败：${err.message}\n请尝试手动右键图片保存`);
+            } finally {
+                // 恢复按钮状态
+                saveAllBtn.disabled = false;
+                saveAllBtn.textContent = '保存所有图片';
+            }
         }
     </script>
 </body>
