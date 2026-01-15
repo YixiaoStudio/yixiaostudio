@@ -224,7 +224,7 @@
         <div class="points-container">
             <div class="points-info">当前积分：<span id="currentPoints">0</span>（生成一次九宫格图消耗1积分）</div>
             <div class="invite-code-box">
-                <input type="text" id="inviteCodeInput" placeholder="输入邀请码兑换积分">
+                <input type="text" id="inviteCodeInput" placeholder="输入令牌兑换积分">
                 <button id="exchangeBtn" onclick="exchangeInviteCode()">兑换积分</button>
             </div>
         </div>
@@ -282,14 +282,18 @@
         const UPLOAD_API = VOLC_API_BASE + '/api/upload-to-tos';
         const GENERATE_API = VOLC_API_BASE + '/api/generate-image';
 
-        // ========== 新增：积分&邀请码相关配置 ==========
-        const GITHUB_CONFIG = {
-            token: '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', // 你的Token
-            gistId: '98b81b0e554f8578a9aa725cf00906b2', // 你的Gist ID
-            usedCodesKey: 'usedInviteCodes' // 本地存储已使用邀请码的Key
+        // ========== 修改：积分&令牌相关配置 ==========
+        // 内置令牌配置（替换原GITHUB_CONFIG）
+        const TOKEN_CONFIG = {
+            tokens: {
+                'YX5': 5,
+                'YX10': 10,
+                'YX20': 20
+            },
+            usedTokensKey: 'usedInviteCodes', // 本地存储已使用令牌的Key
+            exchangeLimitSeconds: 2 // 兑换限流：2秒
         };
         let lastExchangeTime = 0; // 最后一次兑换时间（限流）
-        const EXCHANGE_LIMIT_SECONDS = 2; // 兑换限流：2秒
         const GENERATE_COST = 1; // 生成一次九宫格消耗的积分
 
         // 初始化：加载保存的标签 + 初始化九宫格 + 加载积分
@@ -298,11 +302,11 @@
             initTags(); 
             bindTagChangeEvent(); 
             document.getElementById('pauseBtn').style.display = 'none';
-            // 新增：加载本地积分
+            // 加载本地积分
             loadPointsFromLocal();
         };
 
-        // ========== 新增：积分相关核心函数 ==========
+        // ========== 积分相关核心函数（保持不变） ==========
         // 加载本地积分
         function loadPointsFromLocal() {
             const points = localStorage.getItem('photoGeneratorPoints') || '0';
@@ -321,7 +325,7 @@
         function deductPoints() {
             const currentPoints = Number(document.getElementById('currentPoints').textContent);
             if (currentPoints < GENERATE_COST) {
-                alert(`积分不足！生成一次需要${GENERATE_COST}积分，当前只有${currentPoints}积分，请先兑换邀请码`);
+                alert(`积分不足！生成一次需要${GENERATE_COST}积分，当前只有${currentPoints}积分，请先兑换令牌`);
                 return false;
             }
             updatePoints(currentPoints - GENERATE_COST);
@@ -329,20 +333,20 @@
             return true;
         }
 
-        // ========== 新增：邀请码兑换核心函数（适配字符串积分值） ==========
-        async function exchangeInviteCode() {
-            const inviteCode = document.getElementById('inviteCodeInput').value.trim();
+        // ========== 修改：令牌兑换核心函数（替换原exchangeInviteCode） ==========
+        function exchangeInviteCode() {
+            const token = document.getElementById('inviteCodeInput').value.trim().toUpperCase();
             const exchangeBtn = document.getElementById('exchangeBtn');
             
-            if (!inviteCode) {
-                alert('请输入邀请码！');
+            if (!token) {
+                alert('请输入令牌！');
                 return;
             }
 
             // 前端限流
             const now = Date.now();
-            if (now - lastExchangeTime < EXCHANGE_LIMIT_SECONDS * 1000) {
-                alert(`请${EXCHANGE_LIMIT_SECONDS}秒后再试！`);
+            if (now - lastExchangeTime < TOKEN_CONFIG.exchangeLimitSeconds * 1000) {
+                alert(`请${TOKEN_CONFIG.exchangeLimitSeconds}秒后再试！`);
                 return;
             }
             lastExchangeTime = now;
@@ -352,83 +356,31 @@
             exchangeBtn.textContent = '兑换中...';
 
             try {
-                addDebugLog(`开始验证邀请码：${inviteCode}`);
-                addDebugLog(`请求Gist ID：${GITHUB_CONFIG.gistId}`);
+                addDebugLog(`开始验证令牌：${token}`);
                 
-                // 步骤1：读取Gist中的邀请码列表
-                const gistResponse = await fetch(`https://api.github.com/gists/${GITHUB_CONFIG.gistId}`, {
-                    headers: {
-                        'Authorization': `token ${GITHUB_CONFIG.token}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
-
-                if (!gistResponse.ok) {
-                    const errText = await gistResponse.text();
-                    throw new Error(`Gist请求失败：${gistResponse.status}，详情：${errText}`);
-                }
-
-                const gist = await gistResponse.json();
-                addDebugLog(`Gist完整返回：${JSON.stringify(gist)}`);
-
-                // 关键修复：检查文件是否存在
-                if (!gist.files || !gist.files['invite_codes.json']) {
-                    throw new Error('Gist中未找到invite_codes.json文件，请检查文件名');
-                }
-
-                // 解析invite_codes.json内容
-                const content = JSON.parse(gist.files['invite_codes.json'].content);
-                addDebugLog(`读取到邀请码列表：${JSON.stringify(content)}`);
-
-                // 步骤2：校验邀请码（适配字符串类型的积分值）
-                const formatCode = inviteCode.trim().toUpperCase();
-                const givePointsStr = content[formatCode]; // 先获取字符串类型的积分
-                
-                // 检查邀请码是否存在
-                if (givePointsStr === undefined) {
-                    alert('邀请码无效或已过期');
+                // 步骤1：校验令牌是否存在
+                if (!TOKEN_CONFIG.tokens.hasOwnProperty(token)) {
+                    alert('令牌无效！');
                     exchangeBtn.disabled = false;
                     exchangeBtn.textContent = '兑换积分';
                     return;
                 }
                 
-                // 转换为数字（兼容"10"→10）
-                const givePoints = Number(givePointsStr);
-                if (isNaN(givePoints)) {
-                    throw new Error('邀请码对应的积分格式错误（非数字）');
-                }
-
-                // 步骤3：检查本地是否已使用过
-                const usedCodes = JSON.parse(localStorage.getItem(GITHUB_CONFIG.usedCodesKey) || '[]');
-                if (usedCodes.includes(formatCode)) {
-                    alert('该邀请码已使用过！');
+                // 步骤2：检查本地是否已使用过
+                const usedTokens = JSON.parse(localStorage.getItem(TOKEN_CONFIG.usedTokensKey) || '[]');
+                if (usedTokens.includes(token)) {
+                    alert('该令牌已使用过！');
                     exchangeBtn.disabled = false;
                     exchangeBtn.textContent = '兑换积分';
                     return;
                 }
 
-                // 步骤4：更新Gist（标记为已使用）
-                delete content[formatCode]; // 从Gist中移除已使用的邀请码
-                await fetch(`https://api.github.com/gists/${GITHUB_CONFIG.gistId}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Authorization': `token ${GITHUB_CONFIG.token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        files: {
-                            'invite_codes.json': {
-                                content: JSON.stringify(content, null, 2)
-                            }
-                        }
-                    })
-                });
+                // 步骤3：记录本地已使用令牌
+                usedTokens.push(token);
+                localStorage.setItem(TOKEN_CONFIG.usedTokensKey, JSON.stringify(usedTokens));
 
-                // 步骤5：记录本地已使用邀请码
-                usedCodes.push(formatCode);
-                localStorage.setItem(GITHUB_CONFIG.usedCodesKey, JSON.stringify(usedCodes));
-
-                // 步骤6：发放积分（数字运算）
+                // 步骤4：发放积分
+                const givePoints = TOKEN_CONFIG.tokens[token];
                 const currentPoints = Number(document.getElementById('currentPoints').textContent);
                 const newPoints = currentPoints + givePoints;
                 updatePoints(newPoints);
@@ -438,7 +390,7 @@
 
             } catch (err) {
                 alert(`兑换异常：${err.message}`);
-                addDebugLog(`邀请码兑换异常：${err.message}`);
+                addDebugLog(`令牌兑换异常：${err.message}`);
                 addDebugLog(`错误堆栈：${err.stack}`);
             } finally {
                 // 恢复按钮
