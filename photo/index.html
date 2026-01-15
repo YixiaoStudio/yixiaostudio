@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>seeDream4.5 上传图片生成写真照</title>
+    <title>逸潇次元拍-雪景实验室</title>
     <style>
         * {
             margin: 0;
@@ -14,37 +14,90 @@
             max-width: 960px;
             margin: 20px auto;
             padding: 0 20px;
-            width: 100%; /* 适配小屏幕 */
+            width: 100%;
         }
         h2 {
             color: #333;
             margin: 20px 0;
             text-align: center;
         }
-        /* 模式切换按钮 */
-        .mode-group {
-            margin: 10px 0;
-        }
-        .mode-btn {
-            padding: 8px 16px;
-            margin-right: 8px;
-            cursor: pointer;
-            border: 1px solid #ccc;
-            background: #f5f5f5;
+        /* ========== 新增：积分&邀请码样式 ========== */
+        .points-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 15px 0;
+            padding: 10px;
+            background: #f0f7ff;
             border-radius: 4px;
         }
-        .mode-btn.active {
+        .points-info {
+            font-size: 16px;
+            color: #165DFF;
+            font-weight: bold;
+        }
+        .invite-code-box {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        #inviteCodeInput {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 200px;
+        }
+        #exchangeBtn {
+            padding: 8px 20px;
             background: #165DFF;
             color: white;
-            border-color: #165DFF;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
         }
-        /* 文件上传区域 */
+        #exchangeBtn:disabled {
+            background: #88b1ff;
+            cursor: not-allowed;
+        }
+        /* ========== 隐藏生成标签区域 ========== */
+        .tag-container {
+            display: none !important;
+        }
+        /* ========== 隐藏调试日志区域 ========== */
+        .debug-log {
+            display: none !important;
+        }
+        /* ========== 原有样式（保持不变） ========== */
+        .tag-list {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+        .tag-input {
+            padding: 8px;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #333;
+            word-break: break-all;
+            width: 100%;
+            resize: none;
+            min-height: 60px;
+        }
+        .tag-input:focus {
+            outline: none;
+            border-color: #165DFF;
+            box-shadow: 0 0 0 2px rgba(22, 93, 255, 0.1);
+        }
         .upload-area {
             margin: 10px 0;
             padding: 20px;
             border: 1px dashed #eee;
             border-radius: 4px;
-            display: none;
+            display: block;
         }
         .upload-btn {
             padding: 10px 20px;
@@ -70,22 +123,49 @@
             display: none;
             border: 1px solid #eee;
         }
-        /* 生成按钮 */
-        #genBtn {
+        .btn-group {
+            margin: 15px 0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        #genGridBtn {
+            padding: 12px 24px;
+            background: #165DFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #genGridBtn:disabled {
+            background: #88b1ff;
+            cursor: not-allowed;
+        }
+        #pauseBtn {
+            padding: 12px 24px;
+            background: #FF7D00;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            display: none;
+        }
+        #pauseBtn:disabled {
+            background: #ffc080;
+            cursor: not-allowed;
+        }
+        #genSingleBtn {
+            display: none;
             padding: 10px 20px;
             background: #165DFF;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            margin: 10px 0;
-            font-size: 16px;
         }
-        #genBtn:disabled {
-            background: #88b1ff;
-            cursor: not-allowed;
-        }
-        /* 加载提示 + 进度条容器 */
         #loading {
             display: none;
             color: #666;
@@ -93,40 +173,27 @@
             font-size: 16px;
             text-align: center;
         }
-        /* 进度条样式 */
-        .progress-container {
-            width: 100%;
-            max-width: 600px;
-            height: 8px;
-            background: #f0f0f0;
-            border-radius: 4px;
-            margin: 10px auto;
-            overflow: hidden;
-            display: none;
+        .progress-tip {
+            text-align: center;
+            color: #165DFF;
+            margin: 10px 0;
+            font-size: 14px;
         }
-        .progress-bar {
-            height: 100%;
-            width: 0%;
-            background: #165DFF;
-            border-radius: 4px;
-            transition: width 0.3s ease; /* 平滑过渡 */
-        }
-        /* 单张图片容器（3:4比例） */
-        .single-image-container {
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
             margin-top: 20px;
-            width: 100%;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
+        }
+        .grid-item {
             position: relative;
             border-radius: 6px;
             overflow: hidden;
-            padding-top: 133.33%; 
+            padding-top: 133.33%;
             background: #f9f9f9;
             border: 1px solid #eee;
         }
-        /* 单张图片样式 */
-        .single-img {
+        .grid-img {
             position: absolute;
             top: 0;
             left: 0;
@@ -135,37 +202,50 @@
             object-fit: contain;
             transition: transform 0.2s ease;
         }
-        .single-img:hover {
+        .grid-img:hover {
             transform: scale(1.02);
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        .single-img.error {
+        .grid-img.error {
             border-color: #ff4d4f;
             color: #ff4d4f;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
-        }
-        /* 结果提示 */
-        .result-tip {
-            margin-top: 15px;
-            color: #666;
-            font-size: 14px;
-            text-align: center;
+            font-size: 12px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>seeDream4.5 上传图片生成写真照</h2>
-        
-        <!-- 模式切换：仅保留图生图 -->
-        <div class="mode-group">
-            <button class="mode-btn active" onclick="switchMode('img2img')">图生图</button>
+        <h2>准备好开启您的冰雪之旅了吗？</h2>
+
+        <!-- ========== 新增：积分&邀请码区域 ========== -->
+        <div class="points-container">
+            <div class="points-info">当前积分：<span id="currentPoints">0</span>（生成一次九宫格图消耗1积分）</div>
+            <div class="invite-code-box">
+                <input type="text" id="inviteCodeInput" placeholder="输入邀请码兑换积分">
+                <button id="exchangeBtn" onclick="exchangeInviteCode()">兑换积分</button>
+            </div>
+        </div>
+
+        <!-- 原有Tag容器 -->
+        <div class="tag-container">
+            <h4>生成标签（共9个，可编辑，自动保存）：</h4>
+            <div class="tag-list" id="tagList">
+                <textarea class="tag-input" placeholder="输入标签1..."></textarea>
+                <textarea class="tag-input" placeholder="输入标签2..."></textarea>
+                <textarea class="tag-input" placeholder="输入标签3..."></textarea>
+                <textarea class="tag-input" placeholder="输入标签4..."></textarea>
+                <textarea class="tag-input" placeholder="输入标签5..."></textarea>
+                <textarea class="tag-input" placeholder="输入标签6..."></textarea>
+                <textarea class="tag-input" placeholder="输入标签7..."></textarea>
+                <textarea class="tag-input" placeholder="输入标签8..."></textarea>
+                <textarea class="tag-input" placeholder="输入标签9..."></textarea>
+            </div>
         </div>
         
-        <!-- 图生图专属：文件上传区域 -->
+        <!-- 原有图片上传区域 -->
         <div class="upload-area" id="uploadArea">
             <button class="upload-btn" onclick="document.getElementById('fileInput').click()">选择本地图片</button>
             <input type="file" id="fileInput" accept="image/jpeg,image/png,image/jpg" />
@@ -173,66 +253,291 @@
             <img id="previewImg" class="preview-img" alt="图片预览" />
         </div>
         
-        <!-- 生成按钮 -->
-        <button id="genBtn" onclick="generateSingleImage()">生成写真照</button>
-        
-        <!-- 加载提示 + 进度条 -->
-        <div id="loading">准备生成...</div>
-        <div class="progress-container" id="progressContainer">
-            <div class="progress-bar" id="progressBar"></div>
+        <!-- 原有按钮组 -->
+        <div class="btn-group">
+            <button id="genGridBtn" onclick="startGridGeneration()" disabled>生成九宫格写真</button>
+            <button id="pauseBtn" onclick="togglePause()">暂停生成</button>
+            <button id="genSingleBtn" onclick="generateSingleImage()"></button>
         </div>
         
-        <!-- 单张图片展示容器 -->
-        <div class="single-image-container" id="resultImageContainer"></div>
+        <!-- 原有提示信息 -->
+        <div id="loading">准备生成...</div>
+        <div class="progress-tip" id="progressTip"></div>
+        <div class="debug-log" id="debugLog">调试日志：</div>
         
-        <!-- 结果提示 -->
-        <div class="result-tip" id="resultTip"></div>
+        <!-- 原有九宫格展示 -->
+        <div class="grid-container" id="gridContainer"></div>
     </div>
 
     <script>
         // 全局变量
-        let currentMode = 'img2img';
-        let uploadedImageUrl = '';
-        let progressInterval = null; // 进度条定时器
+        let uploadedImageUrl = '';       
+        let currentGridIndex = 0;        
+        let isGridGenerating = false;    
+        let isPaused = false;            
+        let generationTimer = null;      
+        const STORAGE_KEY = 'photoGeneratorTags';
         // 后端接口地址
         const VOLC_API_BASE = 'https://sd5j17d5mg7k3v1e7vu60.apigateway-cn-beijing.volceapi.com'; 
         const UPLOAD_API = VOLC_API_BASE + '/api/upload-to-tos';
         const GENERATE_API = VOLC_API_BASE + '/api/generate-image';
 
-        // 1. 切换模式
-        function switchMode(mode) {
-            currentMode = mode;
-            document.querySelectorAll('.mode-btn').forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.onclick.toString().includes(mode)) {
-                    btn.classList.add('active');
-                }
-            });
-            document.getElementById('uploadArea').style.display = 'block';
-            // 重置状态（包括进度条）
-            resetProgress();
-            uploadedImageUrl = '';
-            document.getElementById('previewImg').style.display = 'none';
-            document.getElementById('resultImageContainer').innerHTML = '';
-            document.getElementById('resultTip').textContent = '';
+        // ========== 新增：积分&邀请码相关配置 ==========
+        const GITHUB_CONFIG = {
+            token: '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', // 你的Token
+            gistId: '98b81b0e554f8578a9aa725cf00906b2', // 你的Gist ID
+            usedCodesKey: 'usedInviteCodes' // 本地存储已使用邀请码的Key
+        };
+        let lastExchangeTime = 0; // 最后一次兑换时间（限流）
+        const EXCHANGE_LIMIT_SECONDS = 2; // 兑换限流：2秒
+        const GENERATE_COST = 1; // 生成一次九宫格消耗的积分
+
+        // 初始化：加载保存的标签 + 初始化九宫格 + 加载积分
+        window.onload = function() {
+            initGridContainer();
+            initTags(); 
+            bindTagChangeEvent(); 
+            document.getElementById('pauseBtn').style.display = 'none';
+            // 新增：加载本地积分
+            loadPointsFromLocal();
+        };
+
+        // ========== 新增：积分相关核心函数 ==========
+        // 加载本地积分
+        function loadPointsFromLocal() {
+            const points = localStorage.getItem('photoGeneratorPoints') || '0';
+            document.getElementById('currentPoints').textContent = points;
+            addDebugLog(`加载本地积分：${points}`);
         }
 
-        // 2. 监听文件选择
+        // 更新积分（本地存储）
+        function updatePoints(newPoints) {
+            localStorage.setItem('photoGeneratorPoints', newPoints.toString());
+            document.getElementById('currentPoints').textContent = newPoints;
+            addDebugLog(`积分更新为：${newPoints}`);
+        }
+
+        // 扣减积分（生成前校验）
+        function deductPoints() {
+            const currentPoints = Number(document.getElementById('currentPoints').textContent);
+            if (currentPoints < GENERATE_COST) {
+                alert(`积分不足！生成一次需要${GENERATE_COST}积分，当前只有${currentPoints}积分，请先兑换邀请码`);
+                return false;
+            }
+            updatePoints(currentPoints - GENERATE_COST);
+            addDebugLog(`扣减${GENERATE_COST}积分，剩余${currentPoints - GENERATE_COST}积分`);
+            return true;
+        }
+
+        // ========== 新增：邀请码兑换核心函数（适配字符串积分值） ==========
+        async function exchangeInviteCode() {
+            const inviteCode = document.getElementById('inviteCodeInput').value.trim();
+            const exchangeBtn = document.getElementById('exchangeBtn');
+            
+            if (!inviteCode) {
+                alert('请输入邀请码！');
+                return;
+            }
+
+            // 前端限流
+            const now = Date.now();
+            if (now - lastExchangeTime < EXCHANGE_LIMIT_SECONDS * 1000) {
+                alert(`请${EXCHANGE_LIMIT_SECONDS}秒后再试！`);
+                return;
+            }
+            lastExchangeTime = now;
+
+            // 禁用按钮
+            exchangeBtn.disabled = true;
+            exchangeBtn.textContent = '兑换中...';
+
+            try {
+                addDebugLog(`开始验证邀请码：${inviteCode}`);
+                addDebugLog(`请求Gist ID：${GITHUB_CONFIG.gistId}`);
+                
+                // 步骤1：读取Gist中的邀请码列表
+                const gistResponse = await fetch(`https://api.github.com/gists/${GITHUB_CONFIG.gistId}`, {
+                    headers: {
+                        'Authorization': `token ${GITHUB_CONFIG.token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+
+                if (!gistResponse.ok) {
+                    const errText = await gistResponse.text();
+                    throw new Error(`Gist请求失败：${gistResponse.status}，详情：${errText}`);
+                }
+
+                const gist = await gistResponse.json();
+                addDebugLog(`Gist完整返回：${JSON.stringify(gist)}`);
+
+                // 关键修复：检查文件是否存在
+                if (!gist.files || !gist.files['invite_codes.json']) {
+                    throw new Error('Gist中未找到invite_codes.json文件，请检查文件名');
+                }
+
+                // 解析invite_codes.json内容
+                const content = JSON.parse(gist.files['invite_codes.json'].content);
+                addDebugLog(`读取到邀请码列表：${JSON.stringify(content)}`);
+
+                // 步骤2：校验邀请码（适配字符串类型的积分值）
+                const formatCode = inviteCode.trim().toUpperCase();
+                const givePointsStr = content[formatCode]; // 先获取字符串类型的积分
+                
+                // 检查邀请码是否存在
+                if (givePointsStr === undefined) {
+                    alert('邀请码无效或已过期');
+                    exchangeBtn.disabled = false;
+                    exchangeBtn.textContent = '兑换积分';
+                    return;
+                }
+                
+                // 转换为数字（兼容"10"→10）
+                const givePoints = Number(givePointsStr);
+                if (isNaN(givePoints)) {
+                    throw new Error('邀请码对应的积分格式错误（非数字）');
+                }
+
+                // 步骤3：检查本地是否已使用过
+                const usedCodes = JSON.parse(localStorage.getItem(GITHUB_CONFIG.usedCodesKey) || '[]');
+                if (usedCodes.includes(formatCode)) {
+                    alert('该邀请码已使用过！');
+                    exchangeBtn.disabled = false;
+                    exchangeBtn.textContent = '兑换积分';
+                    return;
+                }
+
+                // 步骤4：更新Gist（标记为已使用）
+                delete content[formatCode]; // 从Gist中移除已使用的邀请码
+                await fetch(`https://api.github.com/gists/${GITHUB_CONFIG.gistId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `token ${GITHUB_CONFIG.token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'invite_codes.json': {
+                                content: JSON.stringify(content, null, 2)
+                            }
+                        }
+                    })
+                });
+
+                // 步骤5：记录本地已使用邀请码
+                usedCodes.push(formatCode);
+                localStorage.setItem(GITHUB_CONFIG.usedCodesKey, JSON.stringify(usedCodes));
+
+                // 步骤6：发放积分（数字运算）
+                const currentPoints = Number(document.getElementById('currentPoints').textContent);
+                const newPoints = currentPoints + givePoints;
+                updatePoints(newPoints);
+                
+                alert(`兑换成功！获得${givePoints}积分，当前总积分：${newPoints}`);
+                document.getElementById('inviteCodeInput').value = ''; // 清空输入框
+
+            } catch (err) {
+                alert(`兑换异常：${err.message}`);
+                addDebugLog(`邀请码兑换异常：${err.message}`);
+                addDebugLog(`错误堆栈：${err.stack}`);
+            } finally {
+                // 恢复按钮
+                exchangeBtn.disabled = false;
+                exchangeBtn.textContent = '兑换积分';
+            }
+        }
+
+        // ========== 原有标签相关函数（保持不变） ==========
+        const DEFAULT_TAGS = [
+            '严格参考图像，100%还原复刻。（电影级面光：1.6），（光线追踪：1.5），极致美学，最佳杰作，获奖作品，最佳品质。刻意扬起雪雾形成满屏雪雾占满屏幕，关键画面：雪雾是刻意扬起的，雪雾从下往上飞。下面密集上面稀疏。刻意主动扬雪形成大面积雪雾包裹人物与周围空间100%，雪雾颗粒清晰可见、飞溅雪点冻结瞬间，前景雪雾轻微动感模糊，人物主体清晰锐利，皮肤质感与服装面料细节真实。真实摄影风格，时尚运动杂志大片质感。雪道背景，整体冷调蓝白氛围，阴天漫射光。低机位仰拍视角，全身构图，主体占画面75%，强透视，人物居中，景深虚化背景。1位美女单板滑雪者，冷白皮，清透韩系妆容，黑色长直发披散，头戴滑雪护目镜与头盔。人物穿滑雪套装外套，黑色手套，黑色单板固定器与雪靴。姿势：把站立姿势，手中拿着滑雪板，穿着滑雪连体服（带装饰），搭配粉色边框滑雪镜，手持黑粉配色滑雪板，背景是雪山日落远景，柔和自然光线 神情冷感、高级厌世脸。高细节，超清8k，HDR，清晰对焦在人物面部与上半身，背景干净极简。',
+            '滑雪场，白色滑雪服，头上带着滑雪镜，手里拿着滑雪板，身材好。长发，大背影，举手比耶，场景抓拍，独特的拍摄角度，非对称，动态模糊，低光环境，光影美学，自然色彩，丰富层次感，细腻画质，真实，意境，虚化柔和过渡，情绪氛围感，胶片质感，电影质感，大师作品，获奖作品。看着镜头，略带随意，',
+            '（8K超写实，照片级质感），年轻亚裔女性的半身人像，穿着米白色宽松高领毛衣，腿上盖着红色细黑格纹毛毯，双手捧着一杯冒着热气的热饮（顶部有奶油与可可粉装饰）；面向左边，坐在山间木屋的阳台扶手椅上，阳台栏杆为黑色铁艺雕花样式，栏杆与地面覆盖积雪；背景是晴朗蓝天下的雪山群峰与被雪覆盖的森林，明亮温暖的冬日阳光，治愈放松的度假氛围，50mm镜头拍摄',
+            '滑雪场上初级道上。一个8中长发女孩，她个子高，身材好头戴滑雪帽，碎发随风飘逸，她已有3年的初级道滑雪经验，单板；穿着一身粉色的滑雪服，正在熟练的滑雪，真实照片，高清摄影，细节真实，且动感十足。背景滑雪场初级道，雪山树木，几个人也在滑雪，此时，滑雪的女孩踏着滑雪板，双手拿着滑雪杆，从平缓坡向前滑行，身后溅起一大片雪花。',
+            '（8K超写实，照片级细节），年轻亚裔女性的全身人像，戴着米白色针织毛线帽，穿着白黑拼色滑雪夹克与黑色滑雪裤，双手各持一支带黑色固定器的滑雪板（板面有白色箭头与红黑装饰），站在积雪覆盖的高山滑雪场上；背景是连绵的雪山群峰，晴朗的湛蓝色天空，明亮的日光，清晰的雪面脚印，清新通透的冬日氛围，广角镜头拍摄，背后的雪山有很多细节，画面真实感',
+            '（8K超写实，照片级细节），年轻亚裔女性坐在高山缆车车厢内，个子很高，穿着米色高领毛衣、浅灰色紧身裤，搭配同色系流苏围巾与短靴；车厢内是浅棕色布艺座椅与木质小桌，窗外是覆盖积雪的连绵雪山，缆车线路与多辆缆车清晰可见，晴朗的蓝天背景，明亮柔和的自然光，安静治愈的山间缆车氛围，50mm镜头拍摄，窗外的雪山细节丰富，照片真实',
+            '（8K超写实，照片级细节），年轻亚裔女性的近景人像，穿着白黑拼色带毛绒兜帽的冬季羽绒服，温柔微笑，佩戴大尺寸滑雪镜，镜片是彩虹渐变色反光材质（镜片清晰反射出有暖光串灯的雪中小木屋村落），滑雪镜挡住脸部，空中飘着雪花，背景是温馨的冬季滑雪度假村，暖黄色灯光点缀，冬日柔和冷调光线，浅景深效果，温暖治愈的氛围，50mm镜头拍摄',
+            '（8K超写实，照片级质感），年轻亚裔女性的半身人像，穿着酒红色带毛领的羽绒服，内搭米白色高领毛衣，围着格纹长围巾（米色、蓝绿、棕色配色），戴深棕色皮手套，穿黑色紧身裤与棕色雪地靴；站在积雪覆盖的酒店门前道路上，她对着相机镜头摆出pose,背景是木质结构+石墙的高端滑雪度假村大堂（带拱形门、复古壁灯、屋顶积雪），两侧是被雪覆盖的松树与盆栽，冬日明亮柔和的光线，干净清新的雪景氛围，50mm镜头拍摄',
+            '（8K超写实，照片级动态质感），年轻亚裔女性的滑雪抓拍镜头，她个子很高，极速滑雪身前溅起大量雪花挡住双腿，身穿亮蓝色拼黑边的滑雪服，佩戴白色滑雪头盔与护目镜，戴黑色滑雪手套、手持滑雪杖，双脚踩滑雪板在雪坡上滑行，雪沫飞溅的动感效果；背景是晴朗蓝天下的雪山群峰与被雪覆盖的松树，明亮锐利的冬日日光，清晰的雪面纹理，充满活力的户外滑雪氛围，70mm镜头拍摄'
+        ];
+
+        function initTags() {
+            const tagInputs = document.querySelectorAll('.tag-input');
+            const savedTags = localStorage.getItem(STORAGE_KEY);
+            const tags = savedTags ? JSON.parse(savedTags) : DEFAULT_TAGS;
+            
+            tagInputs.forEach((input, index) => {
+                input.value = tags[index] || '';
+            });
+            addDebugLog('标签初始化完成，已加载本地保存记录');
+        }
+
+        function bindTagChangeEvent() {
+            const tagInputs = document.querySelectorAll('.tag-input');
+            tagInputs.forEach(input => {
+                input.addEventListener('blur', saveTagsToLocal);
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                        saveTagsToLocal();
+                        input.blur();
+                    }
+                });
+            });
+        }
+
+        function saveTagsToLocal() {
+            const tagInputs = document.querySelectorAll('.tag-input');
+            const tags = Array.from(tagInputs).map(input => input.value.trim());
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(tags));
+            addDebugLog('标签已自动保存到本地');
+        }
+
+        function getCurrentTags() {
+            const tagInputs = document.querySelectorAll('.tag-input');
+            const tags = Array.from(tagInputs).map(input => input.value.trim());
+            return tags.map((tag, index) => tag || DEFAULT_TAGS[index]);
+        }
+
+        // ========== 原有功能（修改startGridGeneration：增加积分校验） ==========
+        function initGridContainer() {
+            const gridContainer = document.getElementById('gridContainer');
+            gridContainer.innerHTML = '';
+            for (let i = 0; i < 9; i++) {
+                const gridItem = document.createElement('div');
+                gridItem.className = 'grid-item';
+                gridItem.id = `gridItem-${i}`;
+                
+                const placeholder = document.createElement('div');
+                placeholder.style.display = 'flex';
+                placeholder.style.alignItems = 'center';
+                placeholder.style.justifyContent = 'center';
+                placeholder.style.color = '#999';
+                placeholder.style.fontSize = '12px';
+                placeholder.textContent = `等待生成(${i+1}/9)`;
+                
+                gridItem.appendChild(placeholder);
+                gridContainer.appendChild(gridItem);
+            }
+        }
+
+        function addDebugLog(msg) {
+            const debugLog = document.getElementById('debugLog');
+            debugLog.style.display = 'block';
+            debugLog.innerHTML += `<br>[${new Date().toLocaleTimeString()}] ${msg}`;
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+
         document.getElementById('fileInput').addEventListener('change', async function(e) {
             const file = e.target.files[0];
             if (!file) return;
 
-            // 预览图片
             const previewImg = document.getElementById('previewImg');
             previewImg.src = URL.createObjectURL(file);
             previewImg.style.display = 'block';
 
-            // 转Base64并上传
             const base64Str = await fileToBase64(file);
-            uploadImageToTOS(base64Str);
+            await uploadImageToTOS(base64Str);
         });
 
-        // 辅助：文件转Base64
         function fileToBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -242,14 +547,13 @@
             });
         }
 
-        // 3. 上传图片到TOS
         async function uploadImageToTOS(base64Str) {
             const loading = document.getElementById('loading');
+            const genGridBtn = document.getElementById('genGridBtn');
+            
             loading.style.display = 'block';
             loading.textContent = '正在上传图片到服务器...';
-            
-            // 上传阶段也显示进度条（0-50%）
-            startProgress(0, 50, '上传中...');
+            addDebugLog('开始上传图片');
 
             try {
                 const res = await fetch(UPLOAD_API, {
@@ -258,167 +562,248 @@
                     body: JSON.stringify({ base64Str: base64Str })
                 });
                 const data = await res.json();
+                addDebugLog(`上传返回：${JSON.stringify(data)}`);
 
                 if (data.code === 0) {
                     uploadedImageUrl = data.data.imageUrl;
-                    loading.textContent = '图片上传成功！准备生成写真...';
-                    updateProgress(50); // 上传完成，进度到50%
+                    loading.textContent = '✅ 图片上传成功！请确认积分充足后点击生成';
+                    genGridBtn.disabled = false; 
+                    addDebugLog(`上传成功，URL：${uploadedImageUrl}`);
                 } else {
-                    alert('图片上传失败：' + data.message);
-                    uploadedImageUrl = '';
-                    loading.textContent = '图片上传失败';
-                    resetProgress();
+                    alert('上传失败：' + data.message);
+                    genGridBtn.disabled = true;
+                    addDebugLog(`上传失败：${data.message}`);
                 }
             } catch (err) {
                 alert('上传异常：' + err.message);
-                uploadedImageUrl = '';
-                loading.textContent = '上传异常';
-                resetProgress();
+                genGridBtn.disabled = true;
+                addDebugLog(`上传异常：${err.message}`);
             }
         }
 
-        // 4. 调用生成接口
-        async function callGenerateApi(imageUrl) {
-            return new Promise(async (resolve, reject) => {
-                try {
-                    // 生成阶段进度条（50-90%）
-                    startProgress(50, 90, '生成写真中...');
-
-                    const res = await fetch(GENERATE_API, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ imageUrl: imageUrl })
-                    });
-                    const data = await res.json();
-
-                    if (data.code !== 0) {
-                        throw new Error(data.message || '生成图片失败');
-                    }
-                    // 生成完成，进度到100%
-                    updateProgress(100);
-                    resolve(data.data);
-                } catch (err) {
-                    reject(err);
-                }
-            });
-        }
-
-        // 5. 渲染图片
-        function renderSingleImage(url) {
-            const container = document.getElementById('resultImageContainer');
-            container.innerHTML = '';
-            const img = document.createElement('img');
-            img.className = 'single-img';
-            img.src = url;
-            img.alt = '生成的写真照';
-            img.onerror = function() {
-                this.classList.add('error');
-                this.src = '';
-                this.alt = '图片加载失败';
-                this.textContent = '图片加载失败';
-            };
-            container.appendChild(img);
-        }
-
-        // 6. 核心：生成图片（含进度条逻辑）
-        async function generateSingleImage() {
-            // 校验图片
-            if (currentMode === 'img2img' && !uploadedImageUrl) {
-                alert('请先选择并上传本地图片！');
+        // 修改：启动生成前先校验积分
+        function startGridGeneration() {
+            if (!uploadedImageUrl) {
+                alert('请先上传图片！');
+                return;
+            }
+            // 新增：积分校验
+            if (!deductPoints()) {
+                return;
+            }
+            if (isGridGenerating && !isPaused) {
+                alert('正在生成九宫格，请稍等！');
                 return;
             }
 
-            // 初始化状态
-            const genBtn = document.getElementById('genBtn');
-            const loading = document.getElementById('loading');
-            const resultContainer = document.getElementById('resultImageContainer');
-            const resultTip = document.getElementById('resultTip');
+            isGridGenerating = true;
+            isPaused = false;
+            if (currentGridIndex === 0 || currentGridIndex >= 9) {
+                currentGridIndex = 0;
+                document.getElementById('debugLog').innerHTML = '调试日志：';
+            }
+            
+            document.getElementById('genGridBtn').disabled = true;
+            document.getElementById('pauseBtn').style.display = 'block';
+            document.getElementById('pauseBtn').textContent = '暂停生成';
+            document.getElementById('pauseBtn').disabled = false;
+            
+            document.getElementById('loading').style.display = 'block';
+            addDebugLog(isPaused ? '恢复九宫格生成流程' : '启动九宫格生成流程，共9张');
+            
+            triggerSingleGeneration();
+        }
 
-            genBtn.disabled = true;
-            loading.style.display = 'block';
-            resultContainer.innerHTML = '';
-            resultTip.textContent = '';
+        function togglePause() {
+            isPaused = !isPaused;
+            const pauseBtn = document.getElementById('pauseBtn');
+            const loading = document.getElementById('loading');
+            const progressTip = document.getElementById('progressTip');
+
+            if (isPaused) {
+                if (generationTimer) {
+                    clearTimeout(generationTimer);
+                    generationTimer = null;
+                }
+                pauseBtn.textContent = '继续生成';
+                loading.textContent = `已暂停生成（当前进度：${currentGridIndex}/9）`;
+                progressTip.textContent = `已暂停，已生成${currentGridIndex}张，剩余${9 - currentGridIndex}张`;
+                addDebugLog(`暂停生成，当前进度：${currentGridIndex}/9`);
+            } else {
+                pauseBtn.textContent = '暂停生成';
+                loading.textContent = `恢复生成第 ${currentGridIndex+1}/9 张...`;
+                progressTip.textContent = `恢复生成(${currentGridIndex+1}/9)`;
+                addDebugLog(`恢复生成，继续生成第${currentGridIndex+1}张`);
+                triggerSingleGeneration();
+            }
+        }
+
+        function triggerSingleGeneration() {
+            if (currentGridIndex >= 9 || isPaused) {
+                if (currentGridIndex >= 9) {
+                    document.getElementById('loading').textContent = '✅ 九宫格生成完成！';
+                    document.getElementById('progressTip').textContent = '所有图片生成完成，点击图片查看大图';
+                    document.getElementById('pauseBtn').style.display = 'none';
+                    isGridGenerating = false;
+                    isPaused = false;
+                    addDebugLog('九宫格生成完成');
+                } else {
+                    addDebugLog('当前处于暂停状态，停止生成下一张');
+                }
+                return;
+            }
+
+            const tags = getCurrentTags();
+            const currentTag = tags[currentGridIndex];
+            document.getElementById('loading').textContent = `正在生成第 ${currentGridIndex+1}/9 张：${currentTag.substring(0, 20)}...`;
+            document.getElementById('progressTip').textContent = `生成中(${currentGridIndex+1}/9)`;
+            addDebugLog(`准备生成第${currentGridIndex+1}张，Tag：${currentTag}`);
+
+            document.getElementById('genSingleBtn').click();
+        }
+
+        async function generateSingleImage() {
+            if (!uploadedImageUrl || isPaused) return;
+
+            const tags = getCurrentTags();
+            const currentTag = tags[currentGridIndex];
+            const genSingleBtn = document.getElementById('genSingleBtn');
+            
+            genSingleBtn.disabled = true;
+            addDebugLog(`开始调用生成接口，Tag：${currentTag}`);
 
             try {
-                // 调用生成接口
-                const imageData = await callGenerateApi(uploadedImageUrl);
-                // 渲染图片
-                renderSingleImage(imageData[0].url);
+                const imageUrl = await callGenerateApi(currentTag, uploadedImageUrl);
+                
+                renderGridImage(currentGridIndex, imageUrl);
+                addDebugLog(`第${currentGridIndex+1}张生成成功，URL：${imageUrl}`);
 
-                // 完成状态
-                loading.style.display = 'none';
-                hideProgress();
-                resultTip.textContent = '✅ 写真照生成成功！（3:4比例适配屏幕）';
+                currentGridIndex++;
+                generationTimer = setTimeout(() => {
+                    genSingleBtn.disabled = false;
+                    triggerSingleGeneration();
+                }, 1000);
 
             } catch (err) {
-                // 失败状态
-                loading.style.display = 'none';
-                resetProgress();
-                resultTip.textContent = `❌ 生成失败：${err.message}`;
-                alert(`生成失败：${err.message}`);
-            } finally {
-                genBtn.disabled = false;
+                renderGridImage(currentGridIndex, null, err.message);
+                addDebugLog(`第${currentGridIndex+1}张生成失败：${err.message}`);
+                
+                currentGridIndex++;
+                generationTimer = setTimeout(() => {
+                    genSingleBtn.disabled = false;
+                    triggerSingleGeneration();
+                }, 1000);
             }
         }
 
-        // ========== 进度条核心函数 ==========
-        // 重置进度条
-        function resetProgress() {
-            clearInterval(progressInterval);
-            progressInterval = null;
-            const progressBar = document.getElementById('progressBar');
-            const progressContainer = document.getElementById('progressContainer');
-            progressBar.style.width = '0%';
-            progressContainer.style.display = 'none';
+        async function callGenerateApi(tag, imageUrl) {
+            return new Promise((resolve, reject) => {
+                fetch(GENERATE_API, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: tag,
+                        imageUrl: imageUrl
+                    })
+                })
+                .then(async response => {
+                    addDebugLog(`接口响应状态：${response.status}`);
+                    
+                    if (!response.ok) {
+                        const errText = await response.text();
+                        throw new Error(`HTTP${response.status}：${errText}`);
+                    }
+
+                    try {
+                        const data = await response.json();
+                        addDebugLog(`非流式返回：${JSON.stringify(data)}`);
+                        
+                        if (data.code === 0 && data.data && data.data.length > 0) {
+                            resolve(data.data[0].url);
+                        } else if (data.url) {
+                            resolve(data.url);
+                        } else {
+                            reject(new Error('未找到图片URL'));
+                        }
+                    } catch (e) {
+                        addDebugLog(`非流式解析失败，尝试流式解析：${e.message}`);
+                        
+                        const reader = response.body.getReader();
+                        const decoder = new TextDecoder('utf-8');
+                        let imageUrl = '';
+
+                        function readStream() {
+                            if (isPaused) {
+                                reader.cancel();
+                                reject(new Error('生成已暂停'));
+                                return;
+                            }
+
+                            reader.read().then(({ done, value }) => {
+                                if (done) {
+                                    if (imageUrl) {
+                                        resolve(imageUrl);
+                                    } else {
+                                        reject(new Error('流式解析未找到图片URL'));
+                                    }
+                                    return;
+                                }
+
+                                const chunk = decoder.decode(value, { stream: true });
+                                addDebugLog(`流式数据：${chunk}`);
+                                
+                                const lines = chunk.split('\n').filter(line => line.trim());
+                                lines.forEach(line => {
+                                    if (line.startsWith('data: ')) {
+                                        const dataStr = line.slice(6).trim();
+                                        if (dataStr === '[DONE]') return;
+                                        
+                                        try {
+                                            const data = JSON.parse(dataStr);
+                                            if (data.url || (data.type === 'image_generation.partial_succeeded' && data.url)) {
+                                                imageUrl = data.url || imageUrl;
+                                            }
+                                        } catch (err) {
+                                            addDebugLog(`解析单行失败：${err.message}`);
+                                        }
+                                    }
+                                });
+
+                                readStream();
+                            }).catch(err => reject(new Error('流式读取失败：' + err.message)));
+                        }
+
+                        readStream();
+                    }
+                })
+                .catch(err => reject(new Error('生成失败：' + err.message)));
+            });
         }
 
-        // 隐藏进度条
-        function hideProgress() {
-            clearInterval(progressInterval);
-            progressInterval = null;
-            document.getElementById('progressContainer').style.display = 'none';
-        }
-
-        // 更新进度条到指定百分比
-        function updateProgress(percent) {
-            const progressBar = document.getElementById('progressBar');
-            percent = Math.min(100, Math.max(0, percent)); // 限制0-100
-            progressBar.style.width = `${percent}%`;
-            // 100%后自动隐藏
-            if (percent === 100) {
-                setTimeout(hideProgress, 500);
+        function renderGridImage(index, imageUrl, errorMsg = '') {
+            const gridItem = document.getElementById(`gridItem-${index}`);
+            gridItem.innerHTML = '';
+            
+            const img = document.createElement('img');
+            img.className = 'grid-img';
+            
+            if (imageUrl) {
+                img.src = imageUrl;
+                img.alt = `第${index+1}张`;
+                img.onerror = function() {
+                    this.classList.add('error');
+                    this.src = '';
+                    this.textContent = '图片加载失败';
+                    addDebugLog(`第${index+1}张图片加载失败`);
+                };
+            } else {
+                img.classList.add('error');
+                img.src = '';
+                img.textContent = errorMsg || '生成失败';
             }
+            
+            gridItem.appendChild(img);
         }
-
-        // 启动进度条（从start到end，带提示文本）
-        function startProgress(startPercent, endPercent, text) {
-            // 清除原有定时器
-            clearInterval(progressInterval);
-            // 显示进度条容器
-            const progressContainer = document.getElementById('progressContainer');
-            const loading = document.getElementById('loading');
-            progressContainer.style.display = 'block';
-            loading.textContent = text;
-
-            // 设置初始进度
-            updateProgress(startPercent);
-            let currentPercent = startPercent;
-            // 计算每次增长的步长（总时长约等于生成耗时，这里设为15秒完成50-90%）
-            const step = (endPercent - startPercent) / 150; // 15秒 = 150次 * 100ms
-
-            // 启动定时器更新进度
-            progressInterval = setInterval(() => {
-                currentPercent += step;
-                if (currentPercent >= endPercent) {
-                    currentPercent = endPercent;
-                    clearInterval(progressInterval);
-                }
-                updateProgress(currentPercent);
-            }, 100);
-        }
-
-        // 初始化
-        switchMode('img2img');
     </script>
 </body>
 </html>
