@@ -225,6 +225,7 @@
             padding-top: 133.33%;
             background: #f9f9f9;
             border: 1px solid #eee;
+            cursor: pointer; /* 新增：添加鼠标指针样式 */
         }
         .grid-img {
             position: absolute;
@@ -246,6 +247,49 @@
             align-items: center;
             justify-content: center;
             font-size: 12px;
+        }
+
+        /* ========== 新增：大图预览样式 ========== */
+        .img-preview-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            padding: 20px;
+        }
+        .img-preview-content {
+            max-width: 90%;
+            max-height: 90%;
+            position: relative;
+        }
+        .preview-large-img {
+            max-width: 100%;
+            max-height: 90vh;
+            border-radius: 8px;
+        }
+        .close-preview-btn {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            color: white;
+            font-size: 30px;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .close-preview-btn:hover {
+            color: #ff4d4f;
         }
 
         /* ========== 新增：历史记录样式 ========== */
@@ -391,6 +435,14 @@
             <div id="historyList" class="history-list" style="display: block;">
                 <div class="history-empty" id="historyEmpty">暂无生成记录</div>
             </div>
+        </div>
+    </div>
+
+    <!-- ========== 新增：大图预览弹窗 ========== -->
+    <div class="img-preview-modal" id="imgPreviewModal">
+        <div class="img-preview-content">
+            <button class="close-preview-btn" onclick="closeImagePreview()">&times;</button>
+            <img src="" alt="大图预览" class="preview-large-img" id="previewLargeImg">
         </div>
     </div>
 
@@ -761,7 +813,7 @@
             if (currentGridIndex >= 9 || isPaused) {
                 if (currentGridIndex >= 9) {
                     document.getElementById('loading').textContent = '✅ 九宫格生成完成！';
-                    document.getElementById('progressTip').textContent = '所有图片生成完成，长按图片可保存';
+                    document.getElementById('progressTip').textContent = '所有图片生成完成，长按图片可保存，点击图片查看大图';
                     document.getElementById('pauseBtn').style.display = 'none';
                     // 显示并启用保存全部按钮
                     document.getElementById('saveAllBtn').style.display = 'block';
@@ -932,12 +984,23 @@
                     addDebugLog(`第${index+1}张图片加载失败`);
                 };
                 
+                // 新增：点击图片查看大图
+                img.onclick = function(e) {
+                    e.stopPropagation(); // 阻止事件冒泡
+                    openImagePreview(imageUrl);
+                };
+                
+                // 新增：点击gridItem也能查看大图
+                gridItem.onclick = function() {
+                    openImagePreview(imageUrl);
+                };
+                
                 // 添加单张保存按钮
                 const saveBtn = document.createElement('button');
                 saveBtn.className = 'save-single-btn';
                 saveBtn.textContent = '保存图片';
                 saveBtn.onclick = function(e) {
-                    e.stopPropagation();
+                    e.stopPropagation(); // 阻止事件冒泡到gridItem
                     saveSingleImage(index, imageUrl);
                 };
                 
@@ -948,7 +1011,44 @@
                 img.src = '';
                 img.textContent = errorMsg || '生成失败';
                 gridItem.appendChild(img);
+                // 失败图片不添加点击事件
+                gridItem.onclick = null;
             }
+        }
+
+        // ========== 新增：大图预览功能 ==========
+        function openImagePreview(imageUrl) {
+            const modal = document.getElementById('imgPreviewModal');
+            const largeImg = document.getElementById('previewLargeImg');
+            
+            largeImg.src = imageUrl;
+            modal.style.display = 'flex';
+            
+            // 点击模态框背景关闭
+            modal.onclick = function(e) {
+                if (e.target === modal) {
+                    closeImagePreview();
+                }
+            };
+            
+            // 按ESC键关闭
+            document.addEventListener('keydown', function escHandler(e) {
+                if (e.key === 'Escape') {
+                    closeImagePreview();
+                    document.removeEventListener('keydown', escHandler);
+                }
+            });
+            
+            addDebugLog(`打开大图预览：${imageUrl}`);
+        }
+
+        function closeImagePreview() {
+            const modal = document.getElementById('imgPreviewModal');
+            const largeImg = document.getElementById('previewLargeImg');
+            
+            modal.style.display = 'none';
+            largeImg.src = '';
+            addDebugLog('关闭大图预览');
         }
 
         // ========== 修复CORS问题：保存图片核心功能 ==========
@@ -1282,6 +1382,15 @@
                         this.textContent = '图片加载失败';
                     };
 
+                    // 新增：历史图片也支持点击查看大图
+                    img.onclick = function(e) {
+                        e.stopPropagation();
+                        openImagePreview(imageUrl);
+                    };
+                    gridItem.onclick = function() {
+                        openImagePreview(imageUrl);
+                    };
+
                     // 添加保存按钮
                     const saveBtn = document.createElement('button');
                     saveBtn.className = 'save-single-btn';
@@ -1298,6 +1407,7 @@
                     img.src = '';
                     img.textContent = '生成失败';
                     gridItem.appendChild(img);
+                    gridItem.onclick = null;
                 }
 
                 gridContainer.appendChild(gridItem);
@@ -1311,7 +1421,7 @@
             // 更新提示信息
             document.getElementById('loading').style.display = 'block';
             document.getElementById('loading').textContent = `查看历史记录：${item.timeStr} ${item.isCompleted ? '(已完成)' : '(生成中)'}`;
-            document.getElementById('progressTip').textContent = `共${item.images.filter(url => url).length}张有效图片`;
+            document.getElementById('progressTip').textContent = `共${item.images.filter(url => url).length}张有效图片，点击图片查看大图`;
 
             addDebugLog(`显示第${index+1}条历史记录（${item.timeStr}）`);
         }
