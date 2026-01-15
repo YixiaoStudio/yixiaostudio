@@ -166,37 +166,12 @@
             border-radius: 4px;
             cursor: pointer;
         }
-        /* ========== 新增：保存按钮样式 ========== */
+        /* ========== 移除保存按钮样式 ========== */
         #saveAllBtn {
-            padding: 12px 24px;
-            background: #00B42A;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            display: none;
-        }
-        #saveAllBtn:disabled {
-            background: #86e89c;
-            cursor: not-allowed;
+            display: none !important;
         }
         .save-single-btn {
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            padding: 5px 10px;
-            background: rgba(22, 93, 255, 0.8);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            display: none;
-            z-index: 10;
-        }
-        .grid-item:hover .save-single-btn {
-            display: block;
+            display: none !important;
         }
         /* ========== 原有样式结束 ========== */
         #loading {
@@ -407,17 +382,16 @@
             <img id="previewImg" class="preview-img" alt="图片预览" />
         </div>
         
-        <!-- 原有按钮组 - 新增保存全部按钮 -->
+        <!-- 原有按钮组 - 移除保存全部按钮 -->
         <div class="btn-group">
             <button id="genGridBtn" onclick="startGridGeneration()" disabled>生成九宫格写真</button>
             <button id="pauseBtn" onclick="togglePause()">暂停生成</button>
-            <button id="saveAllBtn" onclick="saveAllImages()" disabled>保存所有图片</button>
             <button id="genSingleBtn" onclick="generateSingleImage()"></button>
         </div>
         
         <!-- 原有提示信息 -->
         <div id="loading">准备生成...</div>
-        <div class="progress-tip" id="progressTip"></div>
+        <div class="progress-tip" id="progressTip">长按图片即可保存</div>
         <div class="debug-log" id="debugLog">调试日志：</div>
         
         <!-- 原有九宫格展示 -->
@@ -666,9 +640,6 @@
             generatedImageUrls = [];
             // 生成新的批次ID
             currentBatchId = Date.now();
-            // 禁用保存全部按钮
-            document.getElementById('saveAllBtn').disabled = true;
-            document.getElementById('saveAllBtn').style.display = 'none';
             
             for (let i = 0; i < 9; i++) {
                 const gridItem = document.createElement('div');
@@ -797,12 +768,12 @@
                 }
                 pauseBtn.textContent = '继续生成';
                 loading.textContent = `已暂停生成（当前进度：${currentGridIndex}/9）`;
-                progressTip.textContent = `已暂停，已生成${currentGridIndex}张，剩余${9 - currentGridIndex}张`;
+                progressTip.textContent = `已暂停，已生成${currentGridIndex}张，剩余${9 - currentGridIndex}张（长按图片即可保存）`;
                 addDebugLog(`暂停生成，当前进度：${currentGridIndex}/9`);
             } else {
                 pauseBtn.textContent = '暂停生成';
                 loading.textContent = `恢复生成第 ${currentGridIndex+1}/9 张...`;
-                progressTip.textContent = `恢复生成(${currentGridIndex+1}/9)`;
+                progressTip.textContent = `恢复生成(${currentGridIndex+1}/9)（长按图片即可保存）`;
                 addDebugLog(`恢复生成，继续生成第${currentGridIndex+1}张`);
                 triggerSingleGeneration();
             }
@@ -815,9 +786,6 @@
                     document.getElementById('loading').textContent = '✅ 九宫格生成完成！';
                     document.getElementById('progressTip').textContent = '所有图片生成完成，长按图片可保存，点击图片查看大图';
                     document.getElementById('pauseBtn').style.display = 'none';
-                    // 显示并启用保存全部按钮
-                    document.getElementById('saveAllBtn').style.display = 'block';
-                    document.getElementById('saveAllBtn').disabled = false;
                     isGridGenerating = false;
                     isPaused = false;
                     addDebugLog('九宫格生成完成');
@@ -833,7 +801,7 @@
             const tags = getCurrentTags();
             const currentTag = tags[currentGridIndex];
             document.getElementById('loading').textContent = `正在生成第 ${currentGridIndex+1}/9 张：${currentTag.substring(0, 20)}...`;
-            document.getElementById('progressTip').textContent = `生成中(${currentGridIndex+1}/9)`;
+            document.getElementById('progressTip').textContent = `生成中(${currentGridIndex+1}/9)（长按图片即可保存）`;
             addDebugLog(`准备生成第${currentGridIndex+1}张，Tag：${currentTag}`);
 
             document.getElementById('genSingleBtn').click();
@@ -995,17 +963,7 @@
                     openImagePreview(imageUrl);
                 };
                 
-                // 添加单张保存按钮
-                const saveBtn = document.createElement('button');
-                saveBtn.className = 'save-single-btn';
-                saveBtn.textContent = '保存图片';
-                saveBtn.onclick = function(e) {
-                    e.stopPropagation(); // 阻止事件冒泡到gridItem
-                    saveSingleImage(index, imageUrl);
-                };
-                
                 gridItem.appendChild(img);
-                gridItem.appendChild(saveBtn);
             } else {
                 img.classList.add('error');
                 img.src = '';
@@ -1049,133 +1007,6 @@
             modal.style.display = 'none';
             largeImg.src = '';
             addDebugLog('关闭大图预览');
-        }
-
-        // ========== 修复CORS问题：保存图片核心功能 ==========
-        function saveSingleImage(index, imageUrl) {
-            try {
-                // 禁用按钮防止重复点击
-                const saveBtn = document.querySelector(`#gridItem-${index} .save-single-btn`);
-                if (saveBtn) {
-                    saveBtn.disabled = true;
-                    saveBtn.textContent = '保存中...';
-                }
-                
-                // 方案1：直接创建下载链接（不通过fetch，避免CORS）
-                const a = document.createElement('a');
-                a.href = imageUrl;
-                a.download = `雪景九宫格_${index+1}.jpg`; // 设置文件名
-                a.target = '_blank'; // 新开窗口下载
-                
-                // 添加到文档并触发点击
-                document.body.appendChild(a);
-                const clickEvent = new MouseEvent('click', {
-                    view: window,
-                    bubbles: true,
-                    cancelable: true
-                });
-                a.dispatchEvent(clickEvent);
-                
-                // 清理资源
-                setTimeout(() => {
-                    document.body.removeChild(a);
-                    // 恢复按钮状态
-                    if (saveBtn) {
-                        saveBtn.disabled = false;
-                        saveBtn.textContent = '保存图片';
-                    }
-                }, 100);
-                
-                addDebugLog(`第${index+1}张图片保存请求已发送`);
-                alert(`第${index+1}张图片开始下载！\n如果没有自动下载，请手动右键图片选择"图片另存为"`);
-                
-            } catch (err) {
-                addDebugLog(`保存第${index+1}张图片失败：${err.message}`);
-                alert(`保存失败：${err.message}\n请尝试右键图片选择"图片另存为"`);
-                
-                // 恢复按钮状态
-                const saveBtn = document.querySelector(`#gridItem-${index} .save-single-btn`);
-                if (saveBtn) {
-                    saveBtn.disabled = false;
-                    saveBtn.textContent = '保存图片';
-                }
-            }
-        }
-
-        function saveAllImages() {
-            const saveAllBtn = document.getElementById('saveAllBtn');
-            saveAllBtn.disabled = true;
-            saveAllBtn.textContent = '保存中...';
-            
-            try {
-                // 检查是否有生成的图片
-                const validImages = generatedImageUrls.filter(url => url);
-                if (validImages.length === 0) {
-                    alert('没有可保存的图片！');
-                    saveAllBtn.disabled = false;
-                    saveAllBtn.textContent = '保存所有图片';
-                    return;
-                }
-                
-                // 逐个创建下载链接
-                let successCount = 0;
-                let failCount = 0;
-                
-                for (let i = 0; i < generatedImageUrls.length; i++) {
-                    const imageUrl = generatedImageUrls[i];
-                    if (!imageUrl) {
-                        failCount++;
-                        addDebugLog(`第${i+1}张图片无有效URL，跳过保存`);
-                        continue;
-                    }
-                    
-                    try {
-                        const a = document.createElement('a');
-                        a.href = imageUrl;
-                        a.download = `雪景九宫格_${i+1}.jpg`;
-                        a.target = '_blank';
-                        
-                        document.body.appendChild(a);
-                        const clickEvent = new MouseEvent('click', {
-                            view: window,
-                            bubbles: true,
-                            cancelable: true
-                        });
-                        a.dispatchEvent(clickEvent);
-                        
-                        setTimeout(() => {
-                            document.body.removeChild(a);
-                        }, 1000);
-                        
-                        successCount++;
-                        addDebugLog(`批量保存：第${i+1}张图片下载请求已发送`);
-                        
-                    } catch (err) {
-                        failCount++;
-                        addDebugLog(`批量保存：第${i+1}张图片保存失败 - ${err.message}`);
-                    }
-                }
-                
-                // 显示保存结果
-                const message = `批量保存请求已发送！
-成功发起：${successCount} 张
-失败/跳过：${failCount} 张
-
-注意：
-1. 浏览器可能会弹出下载确认，请允许下载
-2. 如果部分图片未下载，请手动右键图片选择"图片另存为"
-3. 请检查您的下载文件夹`;
-                alert(message);
-                addDebugLog(`批量保存完成：成功发起${successCount}张，失败${failCount}张`);
-                
-            } catch (err) {
-                addDebugLog(`批量保存异常：${err.message}`);
-                alert(`批量保存失败：${err.message}\n请尝试手动右键图片保存`);
-            } finally {
-                // 恢复按钮状态
-                saveAllBtn.disabled = false;
-                saveAllBtn.textContent = '保存所有图片';
-            }
         }
 
         // ========== 核心修复：历史记录实时保存功能 ==========
@@ -1360,10 +1191,6 @@
             gridContainer.innerHTML = '';
             generatedImageUrls = [...item.images]; // 更新当前图片数组
 
-            // 显示保存全部按钮
-            document.getElementById('saveAllBtn').style.display = 'block';
-            document.getElementById('saveAllBtn').disabled = item.images.filter(url => url).length === 0;
-
             // 渲染每张图片
             item.images.forEach((imageUrl, imgIndex) => {
                 const gridItem = document.createElement('div');
@@ -1391,17 +1218,7 @@
                         openImagePreview(imageUrl);
                     };
 
-                    // 添加保存按钮
-                    const saveBtn = document.createElement('button');
-                    saveBtn.className = 'save-single-btn';
-                    saveBtn.textContent = '保存图片';
-                    saveBtn.onclick = function(e) {
-                        e.stopPropagation();
-                        saveSingleImage(imgIndex, imageUrl);
-                    };
-
                     gridItem.appendChild(img);
-                    gridItem.appendChild(saveBtn);
                 } else {
                     img.classList.add('error');
                     img.src = '';
@@ -1421,7 +1238,7 @@
             // 更新提示信息
             document.getElementById('loading').style.display = 'block';
             document.getElementById('loading').textContent = `查看历史记录：${item.timeStr} ${item.isCompleted ? '(已完成)' : '(生成中)'}`;
-            document.getElementById('progressTip').textContent = `共${item.images.filter(url => url).length}张有效图片，点击图片查看大图`;
+            document.getElementById('progressTip').textContent = `共${item.images.filter(url => url).length}张有效图片，点击图片查看大图（长按图片即可保存）`;
 
             addDebugLog(`显示第${index+1}条历史记录（${item.timeStr}）`);
         }
@@ -1443,7 +1260,7 @@
                 initGridContainer();
                 
                 document.getElementById('loading').style.display = 'none';
-                document.getElementById('progressTip').textContent = '';
+                document.getElementById('progressTip').textContent = '长按图片即可保存';
                 
                 addDebugLog('已清空所有历史记录');
                 alert('所有历史记录已清空！');
