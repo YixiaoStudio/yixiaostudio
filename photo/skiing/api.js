@@ -222,15 +222,16 @@ function renderGridFromState() {
             gridItem.appendChild(errorDiv);
             gridItem.appendChild(retryBtn);
         } else if (i < currentGridIndex && generationStatus[i] === 'pending') {
-            // 处理中但未返回结果的图片
-            const loadingDiv = document.createElement('div');
-            loadingDiv.style.display = 'flex';
-            loadingDiv.style.alignItems = 'center';
-            loadingDiv.style.justifyContent = 'center';
-            loadingDiv.style.color = '#999';
-            loadingDiv.style.fontSize = '12px';
-            loadingDiv.textContent = `处理中(${i+1}/9)`;
-            gridItem.appendChild(loadingDiv);
+            // 处理中但未返回结果的图片 - 显示加载动画
+            const loadingContainer = document.createElement('div');
+            loadingContainer.className = 'grid-loading-container';
+            
+            const spinner = document.createElement('div');
+            spinner.className = 'loading-spinner';
+            
+            loadingContainer.appendChild(spinner);
+            gridItem.appendChild(loadingContainer);
+            gridItem.onclick = null;
         } else {
             // 等待生成的图片
             const placeholder = document.createElement('div');
@@ -609,7 +610,7 @@ function triggerSingleGeneration() {
     // 保存状态
     saveGenerationState();
     
-    // 重新渲染当前格子为处理中
+    // 重新渲染当前格子为处理中（显示加载动画）
     renderGridImage(currentGridIndex, null, '生成中...');
     
     document.getElementById('genSingleBtn').click();
@@ -862,19 +863,22 @@ async function callGenerateApi(tag, imageUrl, requestId) {
     });
 }
 
-// ========== 渲染九宫格图片 ==========
+// ========== 渲染九宫格图片（核心修改：替换加载状态为转动动画） ==========
 function renderGridImage(index, imageUrl, errorMsg = '') {
     const gridItem = document.getElementById(`gridItem-${index}`);
     if (!gridItem) return;
     
+    // 清空当前格子内容
     gridItem.innerHTML = '';
     
-    const img = document.createElement('img');
-    img.className = 'grid-img';
-    
     if (imageUrl) {
+        // 有图片地址：显示图片
+        const img = document.createElement('img');
+        img.className = 'grid-img';
         img.src = imageUrl;
         img.alt = `第${index+1}张`;
+        
+        // 图片加载失败的处理（保持原有逻辑）
         img.onerror = function() {
             this.classList.add('error');
             this.src = '';
@@ -884,41 +888,54 @@ function renderGridImage(index, imageUrl, errorMsg = '') {
             addDebugLog(`第${index+1}张图片加载失败`);
         };
         
-        // 点击图片查看大图
+        // 点击查看大图（保持原有逻辑）
         img.onclick = function(e) {
-            e.stopPropagation(); // 阻止事件冒泡
+            e.stopPropagation();
             openImagePreview(imageUrl);
         };
-        
-        // 点击gridItem也能查看大图
         gridItem.onclick = function() {
             openImagePreview(imageUrl);
         };
         
         gridItem.appendChild(img);
     } else {
-        img.classList.add('error');
-        img.src = '';
-        img.textContent = errorMsg || '生成失败';
-        gridItem.appendChild(img);
-        
-        // 如果是生成失败，添加重试按钮
-        if (errorMsg && errorMsg !== '生成中...') {
-            const retryBtn = document.createElement('button');
-            retryBtn.className = 'retry-btn';
-            retryBtn.textContent = '重试';
-            retryBtn.onclick = function(e) {
-                e.stopPropagation();
-                retrySingleImage(index);
-            };
-            gridItem.appendChild(retryBtn);
+        if (errorMsg === '生成中...') {
+            // 生成中：显示转动的加载动画（核心修改）
+            const loadingContainer = document.createElement('div');
+            loadingContainer.className = 'grid-loading-container';
             
-            // 显示重试按钮
-            document.getElementById('retryFailedBtn').style.display = 'block';
+            const spinner = document.createElement('div');
+            spinner.className = 'loading-spinner';
+            
+            loadingContainer.appendChild(spinner);
+            gridItem.appendChild(loadingContainer);
+            
+            // 生成中时取消点击事件
+            gridItem.onclick = null;
+        } else {
+            // 生成失败：显示原有错误提示
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'grid-img error';
+            errorDiv.textContent = errorMsg || '生成失败';
+            gridItem.appendChild(errorDiv);
+            
+            // 失败时添加重试按钮（保持原有逻辑）
+            if (errorMsg && errorMsg !== '生成中...') {
+                const retryBtn = document.createElement('button');
+                retryBtn.className = 'retry-btn';
+                retryBtn.textContent = '重试';
+                retryBtn.onclick = function(e) {
+                    e.stopPropagation();
+                    retrySingleImage(index);
+                };
+                gridItem.appendChild(retryBtn);
+                
+                // 显示重试按钮
+                document.getElementById('retryFailedBtn').style.display = 'block';
+            }
+            
+            gridItem.onclick = null;
         }
-        
-        // 失败图片不添加点击事件
-        gridItem.onclick = null;
     }
 }
 
@@ -1185,10 +1202,10 @@ function showHistoryItem(index) {
         gridItem.className = 'grid-item';
         gridItem.id = `gridItem-${imgIndex}`;
 
-        const img = document.createElement('img');
-        img.className = 'grid-img';
-
         if (imageUrl) {
+            // 有历史图片：显示图片
+            const img = document.createElement('img');
+            img.className = 'grid-img';
             img.src = imageUrl;
             img.alt = `历史图片${imgIndex+1}`;
             img.onerror = function() {
@@ -1210,24 +1227,38 @@ function showHistoryItem(index) {
 
             gridItem.appendChild(img);
         } else {
-            img.classList.add('error');
-            img.src = '';
-            img.textContent = generationStatus[imgIndex] === 'failed' ? '生成失败' : '未生成';
-            gridItem.appendChild(img);
-            
-            // 如果是生成失败，添加重试按钮
-            if (generationStatus[imgIndex] === 'failed') {
-                const retryBtn = document.createElement('button');
-                retryBtn.className = 'retry-btn';
-                retryBtn.textContent = '重试';
-                retryBtn.onclick = function(e) {
-                    e.stopPropagation();
-                    retrySingleImage(imgIndex);
-                };
-                gridItem.appendChild(retryBtn);
+            if (generationStatus[imgIndex] === 'pending') {
+                // 历史记录中处于生成中的图片：显示加载动画
+                const loadingContainer = document.createElement('div');
+                loadingContainer.className = 'grid-loading-container';
+                
+                const spinner = document.createElement('div');
+                spinner.className = 'loading-spinner';
+                
+                loadingContainer.appendChild(spinner);
+                gridItem.appendChild(loadingContainer);
+                gridItem.onclick = null;
+            } else {
+                // 未生成/失败的图片：显示提示
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'grid-img error';
+                errorDiv.textContent = generationStatus[imgIndex] === 'failed' ? '生成失败' : '未生成';
+                gridItem.appendChild(errorDiv);
+                
+                // 如果是生成失败，添加重试按钮
+                if (generationStatus[imgIndex] === 'failed') {
+                    const retryBtn = document.createElement('button');
+                    retryBtn.className = 'retry-btn';
+                    retryBtn.textContent = '重试';
+                    retryBtn.onclick = function(e) {
+                        e.stopPropagation();
+                        retrySingleImage(imgIndex);
+                    };
+                    gridItem.appendChild(retryBtn);
+                }
+                
+                gridItem.onclick = null;
             }
-            
-            gridItem.onclick = null;
         }
 
         gridContainer.appendChild(gridItem);
