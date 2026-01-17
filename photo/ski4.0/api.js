@@ -23,21 +23,26 @@ let currentBatchId = Date.now();
 const VOLC_API_BASE = 'https://sd5j17d5mg7k3v1e7vu60.apigateway-cn-beijing.volceapi.com'; 
 const UPLOAD_API = VOLC_API_BASE + '/api/upload-to-tos';
 const GENERATE_API = VOLC_API_BASE + '/api/generate-image';
+// 积分&令牌相关接口
+const VERIFY_TOKEN_API = VOLC_API_BASE + '/api/verify-token';
+const GET_POINTS_API = VOLC_API_BASE + '/api/get-points';
+const DEDUCT_POINTS_API = VOLC_API_BASE + '/api/deduct-points';
 
-// 积分&令牌相关配置（支持每日重复使用3次）
+// 积分&令牌相关配置（仅保留必要配置，移除次数规则）
 const TOKEN_CONFIG = {
-    tokens: {
-        'YX5': 5,
-        'YX10': 10,
-        'YX2': 2,
-        'YX20': 20
-    },
-    dailyUseLimit: 3, // 每个令牌每天最多使用3次
-    usedTokensKey: 'usedInviteCodesDaily', // 存储每日使用记录的Key
-    exchangeLimitSeconds: 2 // 兑换限流：2秒
+    exchangeLimitSeconds: 2 // 兑换限流：2秒（可选保留）
 };
 let lastExchangeTime = 0; // 最后一次兑换时间（限流）
 const GENERATE_COST = 1; // 生成一次九宫格消耗的积分
+// 用户ID（需要从前端存储/生成，确保唯一标识用户）
+let userId = localStorage.getItem('photoGeneratorUserId') || generateUserId();
+// 保存用户ID到本地
+localStorage.setItem('photoGeneratorUserId', userId);
+
+// 生成唯一用户ID
+function generateUserId() {
+    return 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
 
 // 默认标签配置
 const DEFAULT_TAGS = [
@@ -53,16 +58,17 @@ const DEFAULT_TAGS = [
 ];
 // ===================== API配置结束 =====================
 
-// 初始化：恢复生成状态 + 加载积分 + 加载历史记录 + 清理过期令牌记录
+// 初始化：恢复生成状态 + 加载积分 + 加载历史记录
 window.onload = function() {
+    // 清空生成状态存储
+    localStorage.removeItem(GENERATION_STATE_KEY);
+    
     // 恢复上次的生成状态
     restoreGenerationState();
     document.getElementById('pauseBtn').style.display = 'none';
     document.getElementById('retryFailedBtn').style.display = 'none';
-    // 加载本地积分
-    loadPointsFromLocal();
-    // 清理过期的令牌使用记录
-    cleanExpiredTokenRecords();
+    // 从后端加载用户积分（核心修改）
+    loadPointsFromBackend();
     // 强制加载历史记录并渲染
     loadHistoryFromLocal();
     renderHistoryList();
@@ -248,62 +254,64 @@ function renderGridFromState() {
     }
 }
 
-// ========== 清理过期的令牌使用记录（仅保留当天） ==========
-function cleanExpiredTokenRecords() {
+// ========== 积分相关核心函数（核心修改：全部调用后端接口） ==========
+// 从后端加载用户积分
+async function loadPointsFromBackend() {
     try {
-        const usedRecords = JSON.parse(localStorage.getItem(TOKEN_CONFIG.usedTokensKey) || '{}');
-        const today = getDateString();
+        const res = await fetch(GET_POINTS_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: userId })
+        });
+        const data = await res.json();
         
-        // 遍历所有记录，只保留今天的
-        for (const token in usedRecords) {
-            const record = usedRecords[token];
-            if (record.date !== today) {
-                delete usedRecords[token]; // 删除非今日的记录
-            }
+        if (data.success) {
+            document.getElementById('currentPoints').textContent = data.totalPoints;
+            addDebugLog(`从后端加载积分：${data.totalPoints}`);
+        } else {
+            document.getElementById('currentPoints').textContent = 0;
+            addDebugLog('加载积分失败，使用默认值0');
         }
-        
-        // 保存清理后的记录
-        localStorage.setItem(TOKEN_CONFIG.usedTokensKey, JSON.stringify(usedRecords));
-        addDebugLog('已清理过期的令牌使用记录');
     } catch (err) {
-        addDebugLog(`清理令牌记录失败：${err.message}`);
+        document.getElementById('currentPoints').textContent = 0;
+        addDebugLog(`加载积分异常：${err.message}，使用默认值0`);
     }
 }
 
-// ========== 获取格式化的日期字符串（YYYY-MM-DD） ==========
-function getDateString(date = new Date()) {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-// ========== 积分相关核心函数 ==========
-// 加载本地积分
-function loadPointsFromLocal() {
-    const points = localStorage.getItem('photoGeneratorPoints') || '0';
-    document.getElementById('currentPoints').textContent = points;
-    addDebugLog(`加载本地积分：${points}`);
-}
-
-// 更新积分（本地存储）
-function updatePoints(newPoints) {
-    localStorage.setItem('photoGeneratorPoints', newPoints.toString());
+// 更新积分显示
+function updatePointsDisplay(newPoints) {
     document.getElementById('currentPoints').textContent = newPoints;
     addDebugLog(`积分更新为：${newPoints}`);
 }
 
-// 扣减积分（生成前校验）
-function deductPoints() {
-    const currentPoints = Number(document.getElementById('currentPoints').textContent);
-    if (currentPoints < GENERATE_COST) {
-        alert(`积分不足！生成一次需要${GENERATE_COST}积分，当前只有${currentPoints}积分，请先兑换令牌`);
+// 从后端扣减积分（生成前校验）
+async function deductPoints() {
+    try {
+        const res = await fetch(DEDUCT_POINTS_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: userId })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            updatePointsDisplay(data.totalPoints);
+            addDebugLog(`扣减${GENERATE_COST}积分成功，剩余${data.totalPoints}积分`);
+            return true;
+        } else {
+            alert(data.message || '积分扣减失败');
+            addDebugLog(`扣减积分失败：${data.message}`);
+            return false;
+        }
+    } catch (err) {
+        alert(`积分扣减异常：${err.message}`);
+        addDebugLog(`扣减积分异常：${err.message}`);
         return false;
     }
-    updatePoints(currentPoints - GENERATE_COST);
-    addDebugLog(`扣减${GENERATE_COST}积分，剩余${currentPoints - GENERATE_COST}积分`);
-    return true;
 }
 
-// ========== 令牌兑换核心函数 ==========
-function exchangeInviteCode() {
+// ========== 令牌兑换核心函数（核心修改：调用后端接口，仅展示后端提示） ==========
+async function exchangeInviteCode() {
     const token = document.getElementById('inviteCodeInput').value.trim().toUpperCase();
     const exchangeBtn = document.getElementById('exchangeBtn');
     
@@ -327,62 +335,31 @@ function exchangeInviteCode() {
     try {
         addDebugLog(`管理员日志：开始验证令牌 ${token}`);
         
-        // 步骤1：校验令牌是否存在
-        if (!TOKEN_CONFIG.tokens.hasOwnProperty(token)) {
-            alert('令牌无效！');
-            exchangeBtn.disabled = false;
-            exchangeBtn.textContent = '兑换积分';
-            return;
+        // 调用后端验证令牌接口（核心修改）
+        const res = await fetch(VERIFY_TOKEN_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                token: token,
+                userId: userId
+            })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            // 兑换成功：展示后端返回的提示
+            alert(data.message);
+            updatePointsDisplay(data.totalPoints);
+            addDebugLog(`管理员日志：令牌 ${token} 兑换成功，用户积分：${data.totalPoints}`);
+            document.getElementById('inviteCodeInput').value = ''; // 清空输入框
+        } else {
+            // 兑换失败：直接展示后端返回的提示（如"令牌已用尽，无法兑换"）
+            alert(data.message || '令牌兑换失败');
+            addDebugLog(`管理员日志：令牌 ${token} 兑换失败：${data.message}`);
         }
-        
-        // 步骤2：检查今日使用次数（仅后台逻辑，不提示用户）
-        const today = getDateString();
-        const usedRecords = JSON.parse(localStorage.getItem(TOKEN_CONFIG.usedTokensKey) || '{}');
-        
-        // 初始化该令牌的今日记录
-        if (!usedRecords[token]) {
-            usedRecords[token] = {
-                date: today,
-                useCount: 0
-            };
-        }
-        
-        // 非今日则重置计数
-        if (usedRecords[token].date !== today) {
-            usedRecords[token].date = today;
-            usedRecords[token].useCount = 0;
-        }
-        
-        // 检查今日使用次数是否超限（仅你可见日志，用户只看到"令牌无效"）
-        if (usedRecords[token].useCount >= TOKEN_CONFIG.dailyUseLimit) {
-            alert('令牌无效！');
-            addDebugLog(`管理员日志：令牌 ${token} 今日已使用${usedRecords[token].useCount}次，达到每日${TOKEN_CONFIG.dailyUseLimit}次限制`);
-            exchangeBtn.disabled = false;
-            exchangeBtn.textContent = '兑换积分';
-            return;
-        }
-
-        // 步骤3：更新使用次数
-        usedRecords[token].useCount += 1;
-        localStorage.setItem(TOKEN_CONFIG.usedTokensKey, JSON.stringify(usedRecords));
-
-        // 步骤4：发放积分
-        const givePoints = TOKEN_CONFIG.tokens[token];
-        const currentPoints = Number(document.getElementById('currentPoints').textContent);
-        const newPoints = currentPoints + givePoints;
-        updatePoints(newPoints);
-        
-        // 对用户仅显示基础成功提示，隐藏次数
-        alert(`兑换成功！获得${givePoints}积分，当前总积分：${newPoints}`);
-        // 仅你可见的详细日志
-        addDebugLog(`管理员日志：令牌 ${token} 兑换成功，今日已使用${usedRecords[token].useCount}/${TOKEN_CONFIG.dailyUseLimit}次，用户积分：${newPoints}`);
-        
-        document.getElementById('inviteCodeInput').value = ''; // 清空输入框
-
     } catch (err) {
         alert(`兑换异常：${err.message}`);
         addDebugLog(`令牌兑换异常：${err.message}`);
-        addDebugLog(`错误堆栈：${err.stack}`);
     } finally {
         // 恢复按钮
         exchangeBtn.disabled = false;
@@ -493,13 +470,13 @@ async function uploadImageToTOS(base64Str) {
 }
 
 // ========== 启动九宫格生成 ==========
-function startGridGeneration() {
+async function startGridGeneration() {
     if (!uploadedImageUrl) {
         alert('请先上传图片！');
         return;
     }
-    // 积分校验
-    if (!deductPoints()) {
+    // 积分校验（调用后端扣减积分）
+    if (!await deductPoints()) {
         return;
     }
     if (isGridGenerating && !isPaused) {
@@ -863,7 +840,7 @@ async function callGenerateApi(tag, imageUrl, requestId) {
     });
 }
 
-// ========== 渲染九宫格图片（核心修改：替换加载状态为转动动画） ==========
+// ========== 渲染九宫格图片 ==========
 function renderGridImage(index, imageUrl, errorMsg = '') {
     const gridItem = document.getElementById(`gridItem-${index}`);
     if (!gridItem) return;
@@ -878,7 +855,7 @@ function renderGridImage(index, imageUrl, errorMsg = '') {
         img.src = imageUrl;
         img.alt = `第${index+1}张`;
         
-        // 图片加载失败的处理（保持原有逻辑）
+        // 图片加载失败的处理
         img.onerror = function() {
             this.classList.add('error');
             this.src = '';
@@ -888,7 +865,7 @@ function renderGridImage(index, imageUrl, errorMsg = '') {
             addDebugLog(`第${index+1}张图片加载失败`);
         };
         
-        // 点击查看大图（保持原有逻辑）
+        // 点击查看大图
         img.onclick = function(e) {
             e.stopPropagation();
             openImagePreview(imageUrl);
@@ -900,7 +877,7 @@ function renderGridImage(index, imageUrl, errorMsg = '') {
         gridItem.appendChild(img);
     } else {
         if (errorMsg === '生成中...') {
-            // 生成中：显示转动的加载动画（核心修改）
+            // 生成中：显示转动的加载动画
             const loadingContainer = document.createElement('div');
             loadingContainer.className = 'grid-loading-container';
             
@@ -913,13 +890,13 @@ function renderGridImage(index, imageUrl, errorMsg = '') {
             // 生成中时取消点击事件
             gridItem.onclick = null;
         } else {
-            // 生成失败：显示原有错误提示
+            // 生成失败：显示错误提示
             const errorDiv = document.createElement('div');
             errorDiv.className = 'grid-img error';
             errorDiv.textContent = errorMsg || '生成失败';
             gridItem.appendChild(errorDiv);
             
-            // 失败时添加重试按钮（保持原有逻辑）
+            // 失败时添加重试按钮
             if (errorMsg && errorMsg !== '生成中...') {
                 const retryBtn = document.createElement('button');
                 retryBtn.className = 'retry-btn';

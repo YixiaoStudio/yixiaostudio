@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>逸潇次元拍-雪景实验室</title>
+    <title>逸潇次元拍—滑雪实验室</title>
     <!-- 引入外部CSS样式文件 -->
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
-        <h2>准备好开启您的冰雪之旅了吗？-SD4.0</h2>
+        <h2>准备好开启您的冰雪之旅了吗？</h2>
 
         <!-- 积分&邀请码区域 -->
         <div class="points-container">
@@ -88,5 +88,58 @@
 
     <!-- 引入外部API逻辑文件（放在body末尾确保DOM加载完成） -->
     <script src="api.js"></script>
+
+    <!-- 新增：页面初始化脚本 -->
+    <script>
+        // 页面加载完成后执行初始化，重置当前生成状态（保留历史记录）
+        document.addEventListener('DOMContentLoaded', function() {
+            // 1. 清空当前生成的九宫格（不影响历史记录）
+            document.getElementById('gridContainer').innerHTML = '';
+
+            // 2. 重置按钮状态
+            const genGridBtn = document.getElementById('genGridBtn');
+            const pauseBtn = document.getElementById('pauseBtn');
+            genGridBtn.disabled = true;
+            pauseBtn.textContent = '暂停生成';
+
+            // 3. 重置提示信息
+            document.getElementById('loading').textContent = '准备生成...';
+            document.getElementById('progressTip').textContent = '长按图片即可保存';
+            document.getElementById('debugLog').textContent = '调试日志：';
+
+            // 4. 清空预览图和文件输入
+            const previewImg = document.getElementById('previewImg');
+            previewImg.src = '';
+            previewImg.style.display = 'none';
+            document.getElementById('fileInput').value = '';
+
+            // 5. 重置全局生成状态（适配api.js中的变量）
+            if (typeof isGenerating !== 'undefined') isGenerating = false;
+            if (typeof isPaused !== 'undefined') isPaused = false;
+            if (typeof currentGridIndex !== 'undefined') currentGridIndex = 0;
+            if (typeof failedImages !== 'undefined') failedImages = [];
+
+            // 6. 隐藏页面关闭提醒、关闭大图预览弹窗
+            document.getElementById('beforeunloadTip').style.display = 'none';
+            closeImagePreview();
+
+            // 7. 确保历史记录区域显示正常（仅优化显示，不修改数据）
+            const historyList = document.getElementById('historyList');
+            if (historyList.children.length === 1 && historyList.querySelector('.history-empty')) {
+                document.getElementById('historyEmpty').style.display = 'block';
+            } else {
+                document.getElementById('historyEmpty').style.display = 'none';
+            }
+        });
+
+        // 确保closeImagePreview函数存在（兼容api.js未定义的情况）
+        if (typeof closeImagePreview === 'undefined') {
+            function closeImagePreview() {
+                const modal = document.getElementById('imgPreviewModal');
+                modal.style.display = 'none';
+                document.getElementById('previewLargeImg').src = '';
+            }
+        }
+    </script>
 </body>
 </html>
