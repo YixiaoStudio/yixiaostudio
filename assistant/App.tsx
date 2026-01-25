@@ -11,7 +11,7 @@ import { POPULAR_TOOLS, FEATURED_ARTIFACTS_TOOLS } from './constants';
 
 const getHandDrawnIcon = (slug: string) => `https://img.icons8.com/doodle/96/${slug}.png`;
 // 后端接口地址（替换成你的Flask服务地址，生产环境改线上地址）
-const API_BASE_URL = 'http://127.0.0.1:5000';
+const API_BASE_URL = 'https://sd5r3ie17n7a7iuta91j0.apigateway-cn-beijing.volceapi.com/';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>(TabType.HOME);
