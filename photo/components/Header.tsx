@@ -1,4 +1,3 @@
-// src/components/Header.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import PointsManager from './PointsManager'; 
@@ -16,7 +15,7 @@ interface UserProfile {
   avatar?: string;
 }
 
-// 保留Props接口（仅增加数据传递，不改动）
+// 保留Props接口
 interface HeaderProps {
   currentUser: any; 
   onLoginClick: () => void; 
@@ -41,11 +40,19 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [galleryCount, setGalleryCount] = useState(0);
+  // 🔥 核心修改：将原galleryCount改为【未读数量】unreadGalleryCount
+  const [unreadGalleryCount, setUnreadGalleryCount] = useState(0);
   const [localProfile, setLocalProfile] = useState<UserProfile | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isPlusModalOpen, setIsPlusModalOpen] = useState(false);
+  const [claimLoading, setClaimLoading] = useState({ credits: false, rose: false });
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // 邀请码/令牌相关状态（下拉框内使用）
+  const [inviteCodeInput, setInviteCodeInput] = useState('');
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteMessage, setInviteMessage] = useState('');
+  const [inviteMessageType, setInviteMessageType] = useState<'success' | 'error'>('error');
 
   // 监听 Esc 键关闭弹窗（原有逻辑不变）
   useEffect(() => {
@@ -59,61 +66,91 @@ const Header: React.FC<HeaderProps> = ({
     return () => window.removeEventListener('keydown', handleEsc);
   }, []);
 
-  // 初始化用户数据（仅替换积分来源为后端，样式/逻辑不变）
-  useEffect(() => {
-    const updateHeaderData = () => {
-      // 保留图库数量逻辑
-      const savedGallery = JSON.parse(localStorage.getItem('ai-photo-gallery') || '[]');
-      setGalleryCount(savedGallery.length);
-      
-      // 🔥 仅替换积分来源为后端，其他样式/字段逻辑完全不变
-      if (currentUser) {
-        setLocalProfile({
-          userName: currentUser.username || "次元造像师",
-          points: profile.points, // 后端数据
-          credits: profile.credits, // 后端数据
-          isPlus: profile.isPlusMember || false, // 后端数据
-          crystalRoses: profile.crystalRoses, // 后端数据
-          lastRoseClaimDate: profile.lastRoseClaimDate, // 后端数据
-          lastPointsClaimDate: profile.lastCreditsClaimDate, // 后端数据
-          avatar: currentUser.avatar || 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/female-avatar.png'
-        });
-      } else {
-        setLocalProfile({
-          userName: "次元造像师",
-          points: 0,
-          credits: 0,
-          isPlus: false,
-          crystalRoses: 0,
-          lastRoseClaimDate: '',
-          lastPointsClaimDate: '',
-          avatar: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/female-avatar.png'
-        });
-      }
-    };
+  // 🔥 新增：计算图库未读数量（核心逻辑）
+  const getUnreadGalleryCount = () => {
+    // 获取图库原数据和上次查看的数量（本地存储持久化，刷新不丢失）
+    const savedGallery = JSON.parse(localStorage.getItem('ai-photo-gallery') || '[]');
+    const lastReadCount = Number(localStorage.getItem('ai-photo-gallery-last-read-count') || 0);
+    const currentTotalCount = savedGallery.length;
+    // 未读数量 = 当前总数量 - 上次查看数量（确保非负，避免负数角标）
+    const unread = Math.max(0, currentTotalCount - lastReadCount);
+    return unread;
+  };
+
+  // 🔥 新增：标记图库为已读（进入图库时自动调用）
+  const markGalleryAsRead = () => {
+    const savedGallery = JSON.parse(localStorage.getItem('ai-photo-gallery') || '[]');
+    const currentTotalCount = savedGallery.length;
+    // 将「上次查看数量」更新为当前总数量
+    localStorage.setItem('ai-photo-gallery-last-read-count', currentTotalCount.toString());
+    // 未读数量置0，角标立即消失
+    setUnreadGalleryCount(0);
+  };
+
+  // 封装更新用户数据的函数（原有逻辑修改：替换为未读数量计算）
+  const updateHeaderData = () => {
+    // 🔥 替换：获取未读数量而非总数量
+    const unread = getUnreadGalleryCount();
+    setUnreadGalleryCount(unread);
     
-    // 原有定时逻辑不变
+    if (currentUser) {
+      setLocalProfile({
+        userName: currentUser.username || "次元造像师",
+        points: profile.points, 
+        credits: profile.credits, 
+        isPlus: profile.isPlusMember || false, 
+        crystalRoses: profile.crystalRoses, 
+        lastRoseClaimDate: profile.lastRoseClaimDate, 
+        lastPointsClaimDate: profile.lastCreditsClaimDate, 
+        avatar: currentUser.avatar || 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/female-avatar.png'
+      });
+    } else {
+      setLocalProfile({
+        userName: "次元造像师",
+        points: 0,
+        credits: 0,
+        isPlus: false,
+        crystalRoses: 0,
+        lastRoseClaimDate: '',
+        lastPointsClaimDate: '',
+        avatar: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/female-avatar.png'
+      });
+    }
+  };
+
+  // 初始化用户数据 + 监听profile变化（原有逻辑不变）
+  useEffect(() => {
     updateHeaderData();
-    const interval = setInterval(updateHeaderData, 500);
+    const interval = setInterval(updateHeaderData, 1000);
     return () => clearInterval(interval);
-  }, [currentUser, profile]); // 仅增加profile依赖
+  }, [currentUser, profile]); 
+
+  // 🔥 新增：监听路由变化，进入/gallery页面时自动标记为已读
+  useEffect(() => {
+    if (location.pathname === '/gallery') {
+      markGalleryAsRead();
+    }
+  }, [location.pathname]);
 
   // 点击外部关闭菜单（原有逻辑不变）
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsMenuOpen(false);
+        resetInviteState();
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 退出登录（原有逻辑不变）
+  // 退出登录（原有逻辑不变，可选清空未读标记）
   const handleLocalLogout = () => {
     if (window.confirm('确定要退出登录并清除本地缓存吗？')) {
       onLogoutClick(); 
       setLocalProfile(null);
+      // 🔥 可选：退出登录时清空未读标记（取消注释即可）
+      // localStorage.removeItem('ai-photo-gallery-last-read-count');
     }
   };
 
@@ -126,11 +163,107 @@ const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  // 封装领取Credits的函数（原有逻辑不变）
+  const handleClaimCredits = async () => {
+    if (claimLoading.credits) return;
+    setClaimLoading(prev => ({ ...prev, credits: true }));
+    try {
+      await claimCredits();
+      updateHeaderData();
+      alert('每日Credits领取成功！');
+    } catch (error) {
+      console.error('领取Credits失败:', error);
+      alert('领取失败，请稍后重试');
+    } finally {
+      setClaimLoading(prev => ({ ...prev, credits: false }));
+    }
+  };
+
+  // 封装领取玫瑰的函数（原有逻辑不变）
+  const handleClaimRose = async () => {
+    if (claimLoading.rose) return;
+    setClaimLoading(prev => ({ ...prev, rose: true }));
+    try {
+      await claimRose();
+      updateHeaderData();
+      alert('每日玫瑰领取成功！');
+    } catch (error) {
+      console.error('领取玫瑰失败:', error);
+      alert('领取失败，请稍后重试');
+    } finally {
+      setClaimLoading(prev => ({ ...prev, rose: false }));
+    }
+  };
+
   const closeModal = () => {
     setIsPlusModalOpen(false);
   };
 
-  // 🔥 以下渲染部分完全保留你的原有样式，仅传递PointsManager的props
+  // 重置邀请码/令牌状态
+  const resetInviteState = () => {
+    setInviteCodeInput('');
+    setInviteMessage('');
+  };
+
+  // 处理令牌输入
+  const handleInviteCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInviteCodeInput(e.target.value.trim());
+    setInviteMessage('');
+  };
+
+  // 令牌兑换接口（原有逻辑不变）
+  const handleExchangeInviteCode = async () => {
+    if (!inviteCodeInput) {
+      setInviteMessage('请输入兑换令牌！');
+      setInviteMessageType('error');
+      return;
+    }
+    if (!currentUser?.id || isNaN(Number(currentUser.id))) {
+      setInviteMessage('用户ID无效！');
+      setInviteMessageType('error');
+      return;
+    }
+
+    setInviteLoading(true);
+    try {
+      const API_BASE_URL = 'https://sd5r3ie17n7a7iuta91j0.apigateway-cn-beijing.volceapi.com';
+      const response = await fetch(`${API_BASE_URL}/api/token/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          token: inviteCodeInput.toUpperCase(),
+          userId: currentUser.id.toString()
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        if (data.success) {
+          setInviteMessage(data.message || '令牌验证成功！已发放credits');
+          setInviteMessageType('success');
+          setInviteCodeInput('');
+          await handleClaimCredits();
+          setTimeout(() => setInviteMessage(''), 3000);
+        } else {
+          setInviteMessage(data.message || '令牌无效或已过期');
+          setInviteMessageType('error');
+        }
+      } else {
+        setInviteMessage(`请求失败：${data.message || '服务器错误'}`);
+        setInviteMessageType('error');
+      }
+    } catch (error) {
+      console.error('令牌兑换接口调用失败:', error);
+      setInviteMessage('网络错误，请重试！');
+      setInviteMessageType('error');
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  // 渲染部分（🔥 仅修改角标显示条件：unreadGalleryCount > 0）
   return (
     <header className="sticky top-0 z-50 glass-effect border-b">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -147,7 +280,7 @@ const Header: React.FC<HeaderProps> = ({
           </span>
         </Link>
 
-        {/* Desktop Nav（原有样式完全不变） */}
+        {/* Desktop Nav（🔥 仅修改角标显示条件，显示未读数量） */}
         <nav className="hidden lg:flex items-center space-x-6 text-gray-600 font-black text-sm flex-grow justify-center">
           <Link to="/" className={`transition-colors py-2 border-b-2 ${location.pathname === '/' ? 'text-indigo-600 border-indigo-600' : 'border-transparent hover:text-indigo-600'}`}>
             首页
@@ -156,9 +289,10 @@ const Header: React.FC<HeaderProps> = ({
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.3} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7l5-2.5 5.553 2.776a1 1 0 01.447.894v10.764a1 1 0 01-1.447.894L14 17l-5 3z" /></svg>
             <span>旅行地图</span>
           </Link>
+          {/* 🔥 核心修改：角标仅在未读数量>0时显示，显示未读数量 */}
           <Link to="/gallery" className={`relative transition-colors py-2 border-b-2 ${location.pathname === '/gallery' ? 'text-indigo-600 border-indigo-600' : 'border-transparent hover:text-indigo-600'}`}>
             我的图库
-            {galleryCount > 0 && <span className="absolute -top-1 -right-4 px-1.5 py-0.5 bg-rose-500 text-white text-[9px] font-black rounded-full shadow-lg shadow-rose-200">{galleryCount}</span>}
+            {unreadGalleryCount > 0 && <span className="absolute -top-1 -right-4 px-1.5 py-0.5 bg-rose-500 text-white text-[9px] font-black rounded-full shadow-lg shadow-rose-200">{unreadGalleryCount}</span>}
           </Link>
           <Link to="/community" className={`transition-colors py-2 border-b-2 ${location.pathname === '/community' ? 'text-indigo-600 border-indigo-600' : 'border-transparent hover:text-indigo-600'}`}>
             灵感社区
@@ -169,7 +303,7 @@ const Header: React.FC<HeaderProps> = ({
           </Link>
         </nav>
 
-        {/* User Area（原有样式完全不变，仅传递PointsManager props） */}
+        {/* User Area（原有逻辑完全不变） */}
         <div className="flex items-center space-x-2 md:space-x-3 flex-shrink-0">
           {!currentUser ? (
             <button
@@ -180,16 +314,15 @@ const Header: React.FC<HeaderProps> = ({
             </button>
           ) : (
             <>
-              {/* 🔥 仅传递props，样式完全不变 */}
               <PointsManager 
                 profile={profile}
                 profileLoading={profileLoading}
-                claimCredits={claimCredits}
-                claimRose={claimRose}
+                claimCredits={handleClaimCredits}
+                claimRose={handleClaimRose}
                 deductCredits={deductCredits}
+                claimLoading={claimLoading}
               />
 
-              {/* PLUS Button（原有样式完全不变） */}
               <button
                 onClick={() => setIsPlusModalOpen(true)}
                 className="relative group overflow-hidden px-4 py-1.5 bg-gray-900 text-white rounded-full transition-all hover:ring-2 hover:ring-amber-400">
@@ -201,7 +334,6 @@ const Header: React.FC<HeaderProps> = ({
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1s_infinite]" />
               </button>
 
-              {/* 用户名与头像区域（原有样式完全不变） */}
               <div className="relative flex items-center space-x-2 md:space-x-3 pl-2 border-l border-gray-100" ref={menuRef}>
                 <span className="hidden md:block text-xs font-black text-gray-700 max-w-[80px] truncate">
                   {localProfile?.userName}
@@ -221,10 +353,63 @@ const Header: React.FC<HeaderProps> = ({
                         {localProfile?.isPlus ? '👑 尊享会员' : '普通用户'}
                       </p>
                     </div>
-                    <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="block px-5 py-2.5 text-sm font-black text-gray-700 hover:bg-gray-50">个人中心</Link>
-                    <Link to="/gallery" onClick={() => setIsMenuOpen(false)} className="block px-5 py-2.5 text-sm font-black text-gray-700 hover:bg-gray-50">我的画廊</Link>
-                    <Link to="/tasks" onClick={() => setIsMenuOpen(false)} className="block px-5 py-2.5 text-sm font-black text-gray-700 hover:bg-gray-50">任务与奖励</Link>
-                    <button onClick={handleLocalLogout} className="w-full text-left px-5 py-2.5 text-sm font-black text-rose-600 hover:bg-rose-50">退出登录</button>
+                    
+                    <Link to="/profile" onClick={() => {
+                      setIsMenuOpen(false);
+                      resetInviteState();
+                    }} className="block px-5 py-2.5 text-sm font-black text-gray-700 hover:bg-gray-50">个人中心</Link>
+                    
+                    <Link to="/gallery" onClick={() => {
+                      setIsMenuOpen(false);
+                      resetInviteState();
+                    }} className="block px-5 py-2.5 text-sm font-black text-gray-700 hover:bg-gray-50">我的画廊</Link>
+                    
+                    <div className="px-5 py-3 border-t border-gray-50">
+                      <p className="text-sm font-black text-gray-700 mb-3">令牌兑换</p>
+                      
+                      <input
+                        type="text"
+                        value={inviteCodeInput}
+                        onChange={handleInviteCodeChange}
+                        placeholder="请输入兑换令牌"
+                        className="w-full px-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent mb-3"
+                        disabled={inviteLoading}
+                      />
+                      
+                      <button
+                        onClick={handleExchangeInviteCode}
+                        disabled={inviteLoading}
+                        className="w-full py-2 bg-indigo-600 text-white text-sm font-black rounded-lg hover:bg-indigo-700 transition-all disabled:opacity-70 flex items-center justify-center"
+                      >
+                        {inviteLoading ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            验证中...
+                          </>
+                        ) : (
+                          '确认兑换'
+                        )}
+                      </button>
+                      
+                      {inviteMessage && (
+                        <p className={`text-xs text-center mt-2 ${inviteMessageType === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                          {inviteMessage}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <Link to="/tasks" onClick={() => {
+                      setIsMenuOpen(false);
+                      resetInviteState();
+                    }} className="block px-5 py-2.5 text-sm font-black text-gray-700 hover:bg-gray-50">任务与奖励</Link>
+                    
+                    <button onClick={() => {
+                      handleLocalLogout();
+                      resetInviteState();
+                    }} className="w-full text-left px-5 py-2.5 text-sm font-black text-rose-600 hover:bg-rose-50">退出登录</button>
                   </div>
                 )}
               </div>
@@ -233,7 +418,7 @@ const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* PLUS SUBSCRIPTION MODAL（原有样式/逻辑完全不变） */}
+      {/* PLUS SUBSCRIPTION MODAL（原有逻辑完全不变） */}
       {isPlusModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-12 overflow-hidden">
           <div
@@ -289,7 +474,7 @@ const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      {/* 原有样式完全保留 */}
+      {/* 样式保留 */}
       <style>{`
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes zoom-in-95 { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -297,6 +482,8 @@ const Header: React.FC<HeaderProps> = ({
         .fade-in { animation-name: fade-in; }
         .zoom-in-95 { animation-name: zoom-in-95; }
         @keyframes shimmer { to { transform: translateX(100%); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .animate-spin { animation: spin 1s linear infinite; }
       `}</style>
     </header>
   );

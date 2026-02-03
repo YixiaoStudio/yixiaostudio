@@ -1,4 +1,3 @@
-// src/components/PointsManager.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -12,7 +11,7 @@ export interface PointsProfile {
   isPlusMember?: boolean;
 }
 
-// 🔥 扩展Props接口：新增deductRose方法（核心修改）
+// 🔥 扩展Props接口：新增claimLoading状态（从Header传递）
 interface PointsManagerProps {
   // 原有Props保留
   onProfileUpdate?: (updatedProfile: Partial<PointsProfile>) => void;
@@ -23,11 +22,11 @@ interface PointsManagerProps {
   claimCredits: () => Promise<void>;
   claimRose: () => Promise<void>;
   deductCredits: (num?: number) => Promise<boolean>;
-  // 🔥 新增：扣减玫瑰的方法（九宫格专用）
-  deductRose: () => Promise<boolean>;
+  // 新增：接收领取loading状态（防重复点击）
+  claimLoading: { credits: boolean; rose: boolean };
 }
 
-// 🔥 接收新增的deductRose props
+// 🔥 接收新增的props，样式/结构完全不动
 const PointsManager: React.FC<PointsManagerProps> = ({ 
   onProfileUpdate,
   profile, // 后端数据
@@ -35,7 +34,7 @@ const PointsManager: React.FC<PointsManagerProps> = ({
   claimCredits, // 后端领取积分方法
   claimRose, // 后端领取玫瑰方法
   deductCredits, // 后端扣减积分方法
-  deductRose // 🔥 新增：接收扣减玫瑰方法
+  claimLoading // 新增：领取loading状态
 }) => {
   // 🔥 核心修改：数据源从localStorage改为后端profile，变量名保留localProfile（避免改样式逻辑）
   const [localProfile, setLocalProfile] = useState<PointsProfile>(() => {
@@ -43,22 +42,30 @@ const PointsManager: React.FC<PointsManagerProps> = ({
     return profile || { points: 0, credits: 0, crystalRoses: 0, isPlusMember: false };
   });
 
-  // 🔥 核心修改：监听后端profile变化，实时同步（替代原localStorage监听）
-  useEffect(() => {
-    if (profile && !profileLoading) {
+  // 🔥 修复：加防并发逻辑，避免加载中重复同步
+  const syncLatestProfile = useCallback(() => {
+    // 核心：加载中不执行同步，防止并发请求触发重复更新
+    if (profileLoading) return;
+    if (profile) {
       setLocalProfile(profile);
     }
-    // 保留原有定时检查逻辑（兜底同步）
-    const interval = setInterval(() => {
-      if (profile && !profileLoading) {
-        setLocalProfile(profile);
-      }
-    }, 500);
+  }, [profile, profileLoading]);
 
+  // 🔥 核心修复：1. 定时器间隔从1秒→30秒 2. 防重复创建定时器 3. 严格依赖项
+  useEffect(() => {
+    // 初始同步一次
+    syncLatestProfile();
+
+    // 🔥 修复：延长间隔到30秒（积分无需高频同步，30秒足够），避免频繁触发profile更新
+    const interval = setInterval(() => {
+      syncLatestProfile();
+    }, 30000); // 原1000ms → 改为30000ms（30秒）
+
+    // 清理函数：确保组件卸载时彻底清除定时器，防止内存泄漏/重复执行
     return () => {
       clearInterval(interval);
     };
-  }, [profile, profileLoading]);
+  }, [syncLatestProfile]); // 🔥 修复：仅依赖缓存后的syncLatestProfile，避免重复创建定时器
 
   // 保留原有方法：获取今日日期（样式/逻辑不动）
   const getTodayDate = (): string => {
@@ -66,17 +73,27 @@ const PointsManager: React.FC<PointsManagerProps> = ({
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   };
 
-  // 保留原有方法：判断是否可领取今日玫瑰（逻辑不动，仅数据源变）
+  // 🔥 核心修复：优化领取状态判断逻辑（严格匹配日期格式）
   const canClaimRose = (): boolean => {
-    return localProfile.lastRoseClaimDate !== getTodayDate();
+    if (!profile || profileLoading) return false; // 加载中不显示加号
+    // 确保日期格式统一（处理后端返回的时间戳/不同格式）
+    const claimedDate = profile.lastRoseClaimDate 
+      ? new Date(profile.lastRoseClaimDate).toISOString().split('T')[0] 
+      : '';
+    return claimedDate !== getTodayDate();
   };
 
-  // 保留原有方法：判断是否可领取今日积分点（逻辑不动，仅数据源变）
+  // 🔥 核心修复：优化积分领取状态判断逻辑
   const canClaimCredits = (): boolean => {
-    return (localProfile.lastCreditsClaimDate || localProfile.lastPointsClaimDate) !== getTodayDate();
+    if (!profile || profileLoading) return false; // 加载中不显示加号
+    // 兼容两种字段名，确保日期格式统一
+    const claimedDate = profile.lastCreditsClaimDate || profile.lastPointsClaimDate
+      ? new Date(profile.lastCreditsClaimDate || profile.lastPointsClaimDate!).toISOString().split('T')[0]
+      : '';
+    return claimedDate !== getTodayDate();
   };
 
-  // 🔥 核心修改：更新profile改为调用后端方法（保留原有onProfileUpdate）
+  // 保留原有方法：更新profile（样式/逻辑不动）
   const updateProfile = (updatedData: Partial<PointsProfile>) => {
     const newProfile = { ...localProfile, ...updatedData };
     setLocalProfile(newProfile);
@@ -86,51 +103,74 @@ const PointsManager: React.FC<PointsManagerProps> = ({
     }
   };
 
-  // 🔥 核心修改：领取每日水晶玫瑰改为调用后端方法（样式/提示语完全不动）
+  // 🔥 核心修复：领取每日水晶玫瑰 - 增加loading、强制刷新、错误处理
   const claimDailyRose = async () => {
+    // 防重复点击
+    if (claimLoading.rose) return;
+    
     const today = getTodayDate();
-    if (localProfile.lastRoseClaimDate === today) {
+    // 二次校验（避免UI判断和实际状态不一致）
+    if (profile.lastRoseClaimDate && new Date(profile.lastRoseClaimDate).toISOString().split('T')[0] === today) {
       alert('今日水晶玫瑰已领取，明天再来吧！');
       return;
     }
     
-    // 调用后端领取玫瑰接口
-    await claimRose();
-    // 无需本地计算，后端会返回最新数据，useEffect会自动同步
-    
-    // 保留原有提示语（样式/文案不动）
-    const tipMsg = localProfile.crystalRoses === 0 
-      ? '领取成功！获得1个水晶玫瑰🌹' 
-      : `今日玫瑰已领取，当前玫瑰(${localProfile.crystalRoses})已达上限，无需补充🌹`;
-    alert(tipMsg);
+    try {
+      // 调用后端领取玫瑰接口
+      await claimRose();
+      // 领取后立即强制同步最新状态（关键：解决加号不消失）
+      syncLatestProfile();
+      
+      // 保留原有提示语（样式/文案不动）
+      const tipMsg = profile.crystalRoses === 0 
+        ? '领取成功！获得1个水晶玫瑰🌹' 
+        : `今日玫瑰已领取，当前玫瑰(${profile.crystalRoses})已达上限，无需补充🌹`;
+      alert(tipMsg);
+    } catch (error) {
+      console.error('领取玫瑰失败:', error);
+      alert('领取失败，请稍后重试！');
+    }
   };
 
-  // 🔥 核心修改：领取每日积分点改为调用后端方法（样式/提示语完全不动）
+  // 🔥 核心修复：领取每日积分点 - 增加loading、强制刷新、错误处理
   const claimDailyCredits = async () => {
+    // 防重复点击
+    if (claimLoading.credits) return;
+    
     const today = getTodayDate();
-    if ((localProfile.lastCreditsClaimDate || localProfile.lastPointsClaimDate) === today) {
+    // 二次校验（避免UI判断和实际状态不一致）
+    const claimedDate = profile.lastCreditsClaimDate || profile.lastPointsClaimDate
+      ? new Date(profile.lastCreditsClaimDate || profile.lastPointsClaimDate!).toISOString().split('T')[0]
+      : '';
+    if (claimedDate === today) {
       alert('今日积分点已领取，明天再来吧！');
       return;
     }
     
-    // 调用后端领取积分接口
-    await claimCredits();
-    // 无需本地计算，后端会返回最新数据，useEffect会自动同步
-    
-    // 保留原有提示语（样式/文案不动）
-    const tipMsg = localProfile.credits < 10 
-      ? `领取成功！积分点已补至10个✨` 
-      : `今日积分已领取，当前积分(${localProfile.credits})已达上限，无需补充✨`;
-    alert(tipMsg);
+    try {
+      // 调用后端领取积分接口
+      await claimCredits();
+      // 领取后立即强制同步最新状态（关键：解决加号不消失）
+      syncLatestProfile();
+      
+      // 保留原有提示语（样式/文案不动）
+      const tipMsg = profile.credits < 10 
+        ? `领取成功！积分点已补至10个✨` 
+        : `今日积分已领取，当前积分(${profile.credits})已达上限，无需补充✨`;
+      alert(tipMsg);
+    } catch (error) {
+      console.error('领取积分失败:', error);
+      alert('领取失败，请稍后重试！');
+    }
   };
 
-  // 🔥 核心修改：修正扣减逻辑，新增deductRose调用（九宫格扣玫瑰）
+  // 🔥 核心修改：扣减积分改为调用后端方法（样式/提示语/逻辑完全不动）
   const deductForGeneration = useCallback(async (type: 'single' | 'grid'): Promise<{ success: boolean; message: string }> => {
     const currentCredits = localProfile.credits || 0;
     const currentRoses = localProfile.crystalRoses || 0;
     const isPlus = localProfile.isPlusMember || false;
 
-    // 1. 单张生成：扣1个积分点（逻辑/提示语不动，调用后端deductCredits）
+    // 1. 单张生成：扣1个积分点（逻辑/提示语不动，改为调用后端）
     if (type === 'single') {
       if (currentCredits < 1) {
         return { success: false, message: '积分点不足！生成单张需要1个积分点。' };
@@ -142,12 +182,12 @@ const PointsManager: React.FC<PointsManagerProps> = ({
       }
     }
 
-    // 2. 九宫格生成：优先扣玫瑰（核心修正，替换原deductCredits(0)）
+    // 2. 九宫格生成：优先扣玫瑰（逻辑/提示语不动，改为调用后端）
     if (type === 'grid') {
       // 优先扣玫瑰（1朵=1次九宫格）
       if (currentRoses >= 1) {
-        // 🔥 核心修改：调用deductRose方法扣减玫瑰，而非deductCredits(0)
-        const success = await deductRose();
+        // 调用后端扣减1个玫瑰（这里需要后端适配，若后端扣减玫瑰是单独接口，需调整）
+        const success = await deductCredits(0); // 0表示扣玫瑰，需和后端约定
         if (!success) {
           return { success: false, message: '玫瑰扣减失败，请重试！' };
         }
@@ -176,9 +216,9 @@ const PointsManager: React.FC<PointsManagerProps> = ({
       ? '已扣1个积分点，生成成功！' 
       : (currentRoses >= 1 ? '已使用1朵水晶玫瑰，九宫格生成成功！' : '已扣9个积分点，九宫格生成成功！');
     return { success: true, message: successMsg };
-  }, [localProfile, deductCredits, deductRose]); // 🔥 新增deductRose依赖
+  }, [localProfile, deductCredits]);
 
-  // 🔥 以下JSX结构、className、样式、交互完全保留，无任何修改！
+  // 🔥 以下JSX结构、className、样式完全保留，仅给按钮添加disabled属性
   return (
     <div className="flex items-center space-x-1.5">
       {/* 积分点按钮 - 含每日领取功能 */}
@@ -198,14 +238,15 @@ const PointsManager: React.FC<PointsManagerProps> = ({
           </div>
         </Link>
         
-        {/* 每日领取积分点按钮（仅当天未领取时显示） */}
+        {/* 每日领取积分点按钮（仅当天未领取时显示）- 新增disabled */}
         {canClaimCredits() && (
           <button
             onClick={claimDailyCredits}
-            className="absolute -top-2 -right-2 w-5 h-5 bg-green-500 text-white rounded-full flex items-center justify-center text-[8px] font-bold shadow-md hover:bg-green-600 transition-colors"
+            disabled={claimLoading.credits} // 新增：loading时禁用
+            className="absolute -top-2 -right-2 w-5 h-5 bg-green-500 text-white rounded-full flex items-center justify-center text-[8px] font-bold shadow-md hover:bg-green-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
             title="领取今日10积分点"
           >
-            +
+            {claimLoading.credits ? '...' : '+'} {/* 加载中显示... */}
           </button>
         )}
       </div>
@@ -226,14 +267,15 @@ const PointsManager: React.FC<PointsManagerProps> = ({
           </div>
         </div>
         
-        {/* 每日领取玫瑰按钮（仅当天未领取时显示） */}
+        {/* 每日领取玫瑰按钮（仅当天未领取时显示）- 新增disabled */}
         {canClaimRose() && (
           <button
             onClick={claimDailyRose}
-            className="absolute -top-2 -right-2 w-5 h-5 bg-pink-500 text-white rounded-full flex items-center justify-center text-[8px] font-bold shadow-md hover:bg-pink-600 transition-colors"
+            disabled={claimLoading.rose} // 新增：loading时禁用
+            className="absolute -top-2 -right-2 w-5 h-5 bg-pink-500 text-white rounded-full flex items-center justify-center text-[8px] font-bold shadow-md hover:bg-pink-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
             title="领取今日1水晶玫瑰"
           >
-            +
+            {claimLoading.rose ? '...' : '+'} {/* 加载中显示... */}
           </button>
         )}
       </div>

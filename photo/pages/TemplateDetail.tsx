@@ -1,41 +1,173 @@
-// src/pages/TemplateDetail.tsx
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TEMPLATES } from '../constants';
 import { GalleryItem, UploadHistoryItem } from '../types';
 import SingleImageGenerator from '../components/SingleImageGenerator';
 import GridImageGenerator from '../components/GridImageGenerator';
 import { PointsProfile } from '../components/PointsManager';
+import { PointsRefreshContext } from '../App';
+import { saveGeneratedImageToServer } from './MyGallery';
 
 // API配置
 const VOLC_API_BASE = 'https://sd5j17d5mg7k3v1e7vu60.apigateway-cn-beijing.volceapi.com'; 
 const UPLOAD_API = VOLC_API_BASE + '/api/upload-to-tos';
 const GENERATE_API = VOLC_API_BASE + '/api/generate-image';
 const CONVERTER_API = VOLC_API_BASE + '/api/get-prompt-by-code';
+const USER_IMAGES_API = VOLC_API_BASE + '/api/get-user-images';
+const POINTS_API_BASE_URL = 'https://sd5r3ie17n7a7iuta91j0.apigateway-cn-beijing.volceapi.com/api/points';
 
-// 🔥 1. 定义Props接口，接收后端扣减方法和积分数据
-interface TemplateDetailProps {
-  deductCredits: (num?: number) => Promise<boolean>; // 扣减积分方法
-  deductRose: () => Promise<boolean>;                // 扣减玫瑰方法
-  profile: PointsProfile;                            // 后端积分数据（用于前端判断）
-  profileLoading: boolean;                           // 积分加载状态
-}
+// ========== 临时方案：接口未实现时的降级处理 ==========
+const restoreCreditsApi = async (userId: number, num: number, requestId: string): Promise<boolean> => {
+  console.warn(`[临时提示] 恢复积分接口未实现（404），userId:${userId}, num:${num}, requestId:${requestId}`);
+  // 记录失败日志，供后端人工处理
+  localStorage.setItem(`restore_credits_${Date.now()}`, JSON.stringify({
+    userId, num, requestId, time: new Date().toISOString()
+  }));
+  return false; // 返回false，走人工提示流程
+};
 
-// 🔥 2. 接收Props
-const TemplateDetail: React.FC<TemplateDetailProps> = ({ 
-  deductCredits, 
-  deductRose,
-  profile,
-  profileLoading
-}) => {
+const restoreRoseApi = async (userId: number, requestId: string): Promise<boolean> => {
+  console.warn(`[临时提示] 恢复玫瑰接口未实现（404），userId:${userId}, requestId:${requestId}`);
+  // 记录失败日志，供后端人工处理
+  localStorage.setItem(`restore_rose_${Date.now()}`, JSON.stringify({
+    userId, requestId, time: new Date().toISOString()
+  }));
+  return false; // 返回false，走人工提示流程
+};
+
+// ========== 工具函数 ==========
+const requestPointsApi = async (userId: number, url: string, options: RequestInit = {}) => {
+  try {
+    const userIdStr = String(userId);
+    const timestamp = new Date().getTime();
+    const fullUrl = `${POINTS_API_BASE_URL}${url}?userId=${userIdStr}&t=${timestamp}`;
+    console.log(`[TemplateDetail] 调用积分接口：${fullUrl}`);
+    
+    const res = await fetch(fullUrl, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+      },
+      cache: 'no-cache',
+      credentials: 'include'
+    });
+    
+    // 新增：处理404/非JSON响应
+    if (!res.ok) {
+      console.error(`积分接口请求失败，状态码：${res.status}`);
+      return { success: false, msg: `接口请求失败（${res.status}）` };
+    }
+    
+    const data = await res.json();
+    console.log(`[TemplateDetail] 积分接口返回：`, data);
+    return data;
+  } catch (error) {
+    console.error('[TemplateDetail] 积分接口请求失败:', error);
+    return { success: false, msg: '网络错误，请重试' };
+  }
+};
+
+const getCurrentUserId = (): number | null => {
+  try {
+    const savedUser = localStorage.getItem('ai_photo_generator_user');
+    if (!savedUser) return null;
+    const userData = JSON.parse(savedUser);
+    return userData.id || userData.user_id || null;
+  } catch (err) {
+    console.error('解析用户ID失败:', err);
+    return null;
+  }
+};
+
+const fetchLatestProfile = async (userId: number): Promise<PointsProfile | null> => {
+  const res = await requestPointsApi(userId, '/profile');
+  if (res.success) {
+    return res.data;
+  } else {
+    alert(res.msg || '获取最新积分失败');
+    return null;
+  }
+};
+
+const fetchUserImages = async (userId: number): Promise<UploadHistoryItem[]> => {
+  try {
+    if (!userId) return [];
+    
+    const res = await fetch(`${USER_IMAGES_API}?userId=${userId}&type=upload&limit=10`, {
+      cache: 'no-cache',
+      credentials: 'include'
+    });
+    
+    const data = await res.json();
+    console.log(`[TemplateDetail] 获取用户历史图片返回：`, data);
+    
+    if (data.code === 0 && Array.isArray(data.data)) {
+      return data.data.map(item => ({
+        id: item.timestamp.toString(),
+        fileName: item.fileName || `上传图片_${new Date(item.timestamp).toLocaleDateString()}`,
+        fileType: 'image/jpeg',
+        fileSize: 0,
+        base64Url: item.url,
+        tosUrl: item.url,
+        timestamp: new Date(item.timestamp).toISOString()
+      }));
+    } else {
+      console.error('[TemplateDetail] 获取用户图片失败:', data.message);
+      return [];
+    }
+  } catch (error) {
+    console.error('[TemplateDetail] 获取用户图片接口请求失败:', error);
+    return [];
+  }
+};
+
+const deductCreditsApi = async (userId: number, num: number): Promise<boolean> => {
+  const res = await requestPointsApi(userId, '/deduct-credits', {
+    method: 'POST',
+    body: JSON.stringify({ num })
+  });
+  if (res.success) {
+    return true;
+  } else {
+    alert(res.msg || '扣减积分失败');
+    return false;
+  }
+};
+
+const deductRoseApi = async (userId: number): Promise<boolean> => {
+  const res = await requestPointsApi(userId, '/deduct-rose', {
+    method: 'POST',
+    body: JSON.stringify({ num: 1 })
+  });
+  if (res.success) {
+    return true;
+  } else {
+    alert(res.msg || '扣减玫瑰失败');
+    return false;
+  }
+};
+
+const TemplateDetail: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const template = TEMPLATES.find(t => t.id === id);
   
-  // 🔥 3. 删除本地localStorage积分操作（改用后端profile）
-  // 移除 getProfile 和 updateProfile 函数
+  // ========== 基础状态声明（调整顺序：先声明state，再声明ref） ==========
+  // 1. 积分信息状态
+  const [profile, setProfile] = useState<PointsProfile>({
+    points: 0,
+    credits: 0,
+    crystalRoses: 0,
+    isPlusMember: false,
+    lastRoseClaimDate: '',
+    lastCreditsClaimDate: ''
+  });
 
-  // 基础状态
+  // 2. PLUS会员状态（🔥 修复：先声明isPlus，再声明isPlusRef）
+  const [isPlus, setIsPlus] = useState(false);
+  
+  // 3. 其他基础状态
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -43,38 +175,89 @@ const TemplateDetail: React.FC<TemplateDetailProps> = ({
   const [generationStep, setGenerationStep] = useState<string>('准备生成');
   const [isCompleted, setIsCompleted] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
-  const [isPlus, setIsPlus] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [uploadHistory, setUploadHistory] = useState<UploadHistoryItem[]>([]);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<UploadHistoryItem | null>(null);
+
+  // ========== Ref声明（必须在对应的state之后） ==========
+  // 🔥 修复：isPlusRef初始化在isPlus声明之后，避免"未初始化"错误
+  const isPlusRef = useRef(isPlus);
+  const profileRef = useRef<PointsProfile>(profile);
+  const progressRef = useRef(0);
+  const setProgressRef = useRef<(value: React.SetStateAction<number>) => void>(() => {});
+  
+  // 其他ref
   const requestIdRef = useRef<string>('');
+  const currentRequestInfo = useRef<{
+    requestId: string;
+    deductType: 'credits' | 'rose';
+    deductNum: number;
+  } | null>(null);
+  const savedImageUrls = useRef<Set<string>>(new Set());
+  const syncTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Context引用（放在ref之前/之后都可，不影响）
+  const { refreshPoints } = useContext(PointsRefreshContext);
+
+  // ========== 同步ref和状态 ==========
+  useEffect(() => {
+    isPlusRef.current = isPlus;
+    profileRef.current = profile;
+    setProgressRef.current = setProgress;
+  }, [isPlus, profile, setProgress]);
+
+  useEffect(() => {
+    const initProfileAndImages = async () => {
+      const userId = getCurrentUserId();
+      if (userId) {
+        const latestProfile = await fetchLatestProfile(userId);
+        if (latestProfile) {
+          setProfile(latestProfile);
+          profileRef.current = latestProfile; // 同步到ref
+        }
+
+        const serverHistory = await fetchUserImages(userId);
+        const localHistoryStr = localStorage.getItem('ai-upload-history');
+        const localHistory: UploadHistoryItem[] = localHistoryStr ? JSON.parse(localHistoryStr) : [];
+
+        const combinedHistory = [...serverHistory, ...localHistory].filter(
+          (item, index, self) => index === self.findIndex(t => t.tosUrl === item.tosUrl)
+        );
+
+        const sortedHistory = combinedHistory
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+          .slice(0, 10);
+
+        setUploadHistory(sortedHistory);
+        localStorage.setItem('ai-upload-history', JSON.stringify(sortedHistory));
+      } else {
+        const localHistoryStr = localStorage.getItem('ai-upload-history');
+        if (localHistoryStr) {
+          setUploadHistory(JSON.parse(localHistoryStr));
+        }
+      }
+    };
+
+    initProfileAndImages();
+    
+    // 组件卸载时清理
+    return () => {
+      savedImageUrls.current.clear();
+      currentRequestInfo.current = null;
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    };
+  }, []);
 
   if (!template) {
     return <div className="p-20 text-center font-bold text-gray-500 italic">模版未找到...</div>;
   }
 
-  // 组件挂载加载历史上传记录
-  useEffect(() => {
-    try {
-      const savedHistory = localStorage.getItem('ai-upload-history');
-      if (savedHistory) {
-        const parsedHistory: UploadHistoryItem[] = JSON.parse(savedHistory);
-        parsedHistory.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        setUploadHistory(parsedHistory);
-      }
-    } catch (err) {
-      console.error('加载上传历史失败:', err);
-    }
-  }, []);
-
-  // 调试日志
   const addDebugLog = useCallback((msg: string) => {
     console.log(`[${new Date().toLocaleTimeString()}] ${msg}`);
   }, []);
 
-  // 保存上传记录到localStorage
   const saveUploadHistory = useCallback((file: File, base64Url: string, tosUrl: string) => {
     const newItem: UploadHistoryItem = {
       id: Date.now().toString(),
@@ -91,7 +274,6 @@ const TemplateDetail: React.FC<TemplateDetailProps> = ({
     localStorage.setItem('ai-upload-history', JSON.stringify(limitedHistory));
   }, [uploadHistory]);
 
-  // 选择历史上传图片
   const selectFromHistory = useCallback((item: UploadHistoryItem) => {
     setSelectedHistoryItem(item);
     setSelectedFile(null);
@@ -103,7 +285,6 @@ const TemplateDetail: React.FC<TemplateDetailProps> = ({
     addDebugLog(`选择历史图片：${item.fileName}`);
   }, [addDebugLog]);
 
-  // 删除单条历史上传记录
   const deleteHistoryItem = useCallback((id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (window.confirm('确定要删除这条上传记录吗？')) {
@@ -119,7 +300,6 @@ const TemplateDetail: React.FC<TemplateDetailProps> = ({
     }
   }, [uploadHistory, selectedHistoryItem]);
 
-  // 调用提示词转换服务
   const getPromptByCode = useCallback(async (code: string): Promise<string | string[]> => {
     try {
       addDebugLog(`开始获取提示词，编号：${code}`);
@@ -141,7 +321,6 @@ const TemplateDetail: React.FC<TemplateDetailProps> = ({
     }
   }, [addDebugLog]);
 
-  // 文件转Base64
   const fileToBase64 = useCallback((file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -151,15 +330,19 @@ const TemplateDetail: React.FC<TemplateDetailProps> = ({
     });
   }, []);
 
-  // 上传图片到TOS
   const uploadImageToTOS = useCallback(async (base64Str: string, file: File) => {
     try {
+      const userId = getCurrentUserId();
+      if (!userId) {
+        throw new Error('请先登录后再上传图片！');
+      }
+
       setGenerationStep('正在上传图片到服务器...');
-      addDebugLog('开始上传图片');
+      addDebugLog(`开始上传图片（用户ID：${userId}）`);
       const res = await fetch(UPLOAD_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ base64Str })
+        body: JSON.stringify({ base64Str, userId })
       });
       const data = await res.json();
       if (data.code === 0) {
@@ -180,7 +363,6 @@ const TemplateDetail: React.FC<TemplateDetailProps> = ({
     }
   }, [addDebugLog, saveUploadHistory]);
 
-  // 处理新文件上传
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -204,16 +386,32 @@ const TemplateDetail: React.FC<TemplateDetailProps> = ({
     }
   }, [fileToBase64, uploadImageToTOS]);
 
-  // 调用生成API
+  // ========== 修复Hook错误：重构callGenerateApi，避免在异步中直接调用Hook ==========
   const callGenerateApi = useCallback(async (tag: string, imageUrl: string): Promise<string> => {
+    const userId = getCurrentUserId();
+    if (!userId) {
+      throw new Error('请先登录后再生成图片！');
+    }
+
     const requestId = `single_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     requestIdRef.current = requestId;
     
+    // 使用ref中的状态，避免直接引用Hook状态
+    const currentIsPlus = isPlusRef.current;
+    const currentProfile = profileRef.current;
+    currentRequestInfo.current = {
+      requestId,
+      deductType: currentIsPlus ? (currentProfile.crystalRoses > 0 ? 'rose' : 'credits') : 'credits',
+      deductNum: currentIsPlus ? (currentProfile.crystalRoses > 0 ? 1 : 9) : 1
+    };
+    
     return new Promise((resolve, reject) => {
+      let hasResolved = false;
+      
       fetch(GENERATE_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: tag, imageUrl, requestId })
+        body: JSON.stringify({ prompt: tag, imageUrl, requestId, userId })
       })
       .then(async response => {
         addDebugLog(`接口响应状态[${requestId}]：${response.status}`);
@@ -225,9 +423,15 @@ const TemplateDetail: React.FC<TemplateDetailProps> = ({
         try {
           const data = await response.json();
           if (data.code === 0 && data.data && data.data.length > 0) {
-            resolve(data.data[0].url);
+            if (!hasResolved) {
+              hasResolved = true;
+              resolve(data.data[0].url);
+            }
           } else if (data.url) {
-            resolve(data.url);
+            if (!hasResolved) {
+              hasResolved = true;
+              resolve(data.url);
+            }
           } else {
             reject(new Error('未找到图片URL'));
           }
@@ -238,28 +442,50 @@ const TemplateDetail: React.FC<TemplateDetailProps> = ({
           let resultImageUrl = '';
 
           const readStream = async () => {
-            if (requestIdRef.current !== requestId) { reader.cancel(); reject(new Error('请求已过期')); return; }
+            if (requestIdRef.current !== requestId) {
+              reader.cancel(); 
+              reject(new Error('请求已过期')); 
+              return; 
+            }
+            
             const { done, value } = await reader.read();
             if (done) {
-              resultImageUrl ? resolve(resultImageUrl) : reject(new Error('流式解析未找到图片URL'));
+              if (resultImageUrl && !hasResolved) {
+                hasResolved = true;
+                resolve(resultImageUrl);
+              } else {
+                reject(new Error('流式解析未找到图片URL'));
+              }
               return;
             }
+            
             const chunk = decoder.decode(value, { stream: true });
             chunk.split('\n').filter(line => line.trim()).forEach(line => {
-              if (line.startsWith('data: ')) {
+              if (line.startsWith('data: ') && !hasResolved) {
                 const dataStr = line.slice(6).trim();
                 if (dataStr === '[DONE]') return;
                 try {
                   const data = JSON.parse(dataStr);
                   if (data.url) {
                     resultImageUrl = data.url;
-                    setProgress(prev => Math.min(prev + 10, 100));
+                    // 使用ref中的setProgress，避免直接调用Hook
+                    if (setProgressRef.current) {
+                      setProgressRef.current(prev => Math.min(prev + 10, 100));
+                    }
+                    hasResolved = true;
+                    resolve(resultImageUrl);
                   }
-                } catch (err) { addDebugLog(`解析单行失败[${requestId}]：${(err as Error).message}`); }
+                } catch (err) { 
+                  addDebugLog(`解析单行失败[${requestId}]：${(err as Error).message}`); 
+                }
               }
             });
-            readStream();
+            
+            if (!hasResolved) {
+              readStream();
+            }
           };
+          
           readStream();
         }
       })
@@ -267,30 +493,75 @@ const TemplateDetail: React.FC<TemplateDetailProps> = ({
     });
   }, [addDebugLog]);
 
-  // 保存生成的图片到图库
+  // ========== 修复重复保存：加强幂等性控制（终极版） ==========
   const saveToGallery = useCallback((images: string[]) => {
     if (images.length === 0) return;
-    const saved: GalleryItem[] = JSON.parse(localStorage.getItem('ai-photo-gallery') || '[]');
+    
+    // 1. 内存级去重 + 检查是否已保存过
+    const uniqueImages = Array.from(new Set(images)).filter(url => {
+      const isNew = !savedImageUrls.current.has(url);
+      if (isNew) savedImageUrls.current.add(url);
+      return isNew;
+    });
+    
+    if (uniqueImages.length === 0) {
+      addDebugLog(`所有图片已保存过（内存），跳过保存`);
+      return;
+    }
+    
     const newItem: GalleryItem = {
       id: Date.now().toString(),
       templateId: template.id,
       templateTitle: template.title,
-      images,
+      images: uniqueImages,
       timestamp: new Date().toISOString(),
-      isPlus,
+      isPlus: isPlusRef.current, // 使用ref状态
       originalImage: { tosUrl: uploadedImageUrl, source: selectedHistoryItem ? 'history' : 'upload' }
     };
-    localStorage.setItem('ai-photo-gallery', JSON.stringify([newItem, ...saved]));
-    addDebugLog(`生成成功！${images.length}张图片已自动保存到图库`);
-  }, [template.id, template.title, isPlus, uploadedImageUrl, selectedHistoryItem, addDebugLog]);
-
-  // 启动生成（🔥 核心修改：替换为调用后端扣减方法）
-  const startGeneration = useCallback(async () => {
-    // 积分加载中，禁止操作
-    if (profileLoading) {
-      alert('积分数据加载中，请稍等！');
+    
+    // 2. 本地存储级去重（彻底防止重复）
+    const saved: GalleryItem[] = JSON.parse(localStorage.getItem('ai-photo-gallery') || '[]');
+    // 🔥 修复：更严格的去重逻辑 - 检查每张图片URL是否已存在
+    const urlExistsInLocal = uniqueImages.some(newUrl => 
+      saved.some(savedItem => savedItem.images.includes(newUrl))
+    );
+    
+    if (urlExistsInLocal) {
+      addDebugLog(`图片已存在于本地图库，跳过保存`);
       return;
     }
+    
+    // 3. 保存到本地存储
+    const updatedSaved = [newItem, ...saved];
+    localStorage.setItem('ai-photo-gallery', JSON.stringify(updatedSaved));
+    
+    // 4. 同步到后端（加强防抖，确保只执行一次）
+    const userId = getCurrentUserId();
+    if (userId) {
+      // 🔥 修复：先清除旧的定时器，避免重复执行
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+      // 防抖1秒，避免短时间内多次调用
+      syncTimerRef.current = setTimeout(() => {
+        saveGeneratedImageToServer(userId, newItem)
+          .then(success => {
+            if (success) {
+              addDebugLog(`生成图片${newItem.id}已同步到后端，共${uniqueImages.length}张`);
+            } else {
+              addDebugLog(`生成图片${newItem.id}同步到后端失败`);
+            }
+          })
+          .catch(err => {
+            console.error('[TemplateDetail] 同步生成图片到后端失败:', err);
+            addDebugLog(`生成图片${newItem.id}同步到后端异常：${(err as Error).message}`);
+          });
+      }, 1000);
+    }
+    
+    addDebugLog(`生成成功！${uniqueImages.length}张图片已自动保存到图库`);
+  }, [uploadedImageUrl, selectedHistoryItem, addDebugLog, template.id, template.title]);
+
+  // ========== 核心逻辑：生成图片 + 错误处理 ==========
+  const startGeneration = useCallback(async () => {
     if (!uploadedImageUrl) { 
       alert('请先上传图片或选择历史图片！'); 
       return; 
@@ -300,71 +571,91 @@ const TemplateDetail: React.FC<TemplateDetailProps> = ({
       return; 
     }
 
-    // 从后端profile获取最新积分数据
-    const currentCredits = profile.credits || 0;
-    const currentRoses = profile.crystalRoses || 0;
-    const isPlusMember = profile.isPlusMember || false;
+    const userId = getCurrentUserId();
+    if (!userId) {
+      alert('请先登录后再生成图片！');
+      return;
+    }
+
+    const latestProfile = await fetchLatestProfile(userId);
+    if (!latestProfile) return;
+    const currentCredits = latestProfile.credits || 0;
+    const currentRoses = latestProfile.crystalRoses || 0;
+    const isPlusMember = latestProfile.isPlusMember || false;
+
     let deductSuccess = false;
     let deductMessage = '';
+    let deductType: 'credits' | 'rose' = 'credits';
+    let deductNum = 1;
 
-    // 🔥 4. 替换扣减逻辑：调用后端方法，而非本地操作
-    // 4.1 单张生成：扣1个积分点
+    // 扣减逻辑
     if (!isPlus) {
       if (currentCredits < 1) {
         alert(`积分不足！
 生成单张需要1个积分点。
+当前剩余：${currentCredits}个积分点
 可点击顶部积分图标领取每日10个积分点，或完成任务获取更多。`);
         return;
       }
-      // 调用后端扣减积分方法
-      deductSuccess = await deductCredits(1);
-      if (!deductSuccess) {
-        addDebugLog('[生成失败] 积分扣减失败');
-        return;
-      }
+      deductSuccess = await deductCreditsApi(userId, 1);
+      if (!deductSuccess) return;
       deductMessage = `已扣减1个积分点，剩余${currentCredits - 1}个`;
-    } 
-    // 4.2 九宫格生成：优先扣玫瑰
-    else {
+      deductType = 'credits';
+      deductNum = 1;
+    } else {
       if (currentRoses >= 1) {
-        // 调用后端扣减玫瑰方法
-        deductSuccess = await deductRose();
-        if (!deductSuccess) {
-          addDebugLog('[生成失败] 玫瑰扣减失败');
-          return;
-        }
+        deductSuccess = await deductRoseApi(userId);
+        if (!deductSuccess) return;
         deductMessage = `已使用1朵水晶玫瑰，剩余${currentRoses - 1}朵`;
+        deductType = 'rose';
+        deductNum = 1;
       } else {
         if (!isPlusMember) {
           alert(`无法生成九宫格！
-水晶玫瑰不足且未开通PLUS会员。
-1朵水晶玫瑰可免费生成1次九宫格，或开通PLUS会员使用9积分点生成。`);
+当前水晶玫瑰：0朵 | PLUS会员：未开通
+规则说明：
+1. 1朵水晶玫瑰可免费生成1次九宫格
+2. 开通PLUS会员后，可使用9个积分点生成九宫格
+请先领取每日玫瑰或开通PLUS会员后重试。`);
           return;
         }
         if (currentCredits < 9) {
           alert(`积分不足！
-PLUS会员生成九宫格需要9个积分点，当前仅有${currentCredits}个。
+PLUS会员生成九宫格需要9个积分点。
+当前剩余：${currentCredits}个积分点
 可点击顶部积分图标领取每日10个积分点，或完成任务获取更多。`);
           return;
         }
-        // 调用后端扣减9个积分
-        deductSuccess = await deductCredits(9);
-        if (!deductSuccess) {
-          addDebugLog('[生成失败] 积分扣减失败');
-          return;
-        }
+        deductSuccess = await deductCreditsApi(userId, 9);
+        if (!deductSuccess) return;
         deductMessage = `已扣减9个积分点，剩余${currentCredits - 9}个`;
+        deductType = 'credits';
+        deductNum = 9;
       }
     }
 
     if (deductSuccess) {
       addDebugLog(deductMessage);
+      const newProfile = await fetchLatestProfile(userId);
+      if (newProfile) {
+        setProfile(newProfile);
+        profileRef.current = newProfile; // 同步到ref
+        try {
+          // 优先调用Context刷新，不触发storage事件
+          await refreshPoints();
+        } catch (e) {
+          console.log('Context刷新失败，使用localStorage标记（仅存储，不触发事件）:', e);
+          // 🔥 修复：只存储标记，不触发事件，避免循环
+          localStorage.setItem('ai_points_need_refresh', '1');
+        }
+      }
     }
 
     try {
       setIsGenerating(true);
       setIsCompleted(false);
       setProgress(0);
+      progressRef.current = 0; // 同步到ref
       setErrorMsg('');
       setGeneratedImages([]);
       setGenerationStep('AI正在绘制您的写真');
@@ -374,36 +665,41 @@ PLUS会员生成九宫格需要9个积分点，当前仅有${currentCredits}个�
       const promptData = await getPromptByCode(promptCode);
       let actualGeneratedImages: string[] = [];
 
-      // 单张生成
       if (!isPlus) {
         const generatedImageUrl = await callGenerateApi(promptData as string, uploadedImageUrl);
         actualGeneratedImages = [generatedImageUrl];
         setProgress(100);
-      } 
-      // 九宫格生成
-      else {
+        progressRef.current = 100;
+      } else {
         const gridPrompts = promptData as string[];
         setGenerationStep('九宫格生成中（共9张）...');
-        const generatePromises = gridPrompts.map((prompt, index) => 
-          callGenerateApi(prompt, uploadedImageUrl).catch(err => {
-            addDebugLog(`九宫格第${index+1}张生成失败：${(err as Error).message}`);
-            return '';
-          })
-        );
+        // 限制并发数，避免重复请求
+        const generatePromises = [];
+        for (let i = 0; i < gridPrompts.length; i++) {
+          // 每个请求间隔800ms，减少后端压力
+          await new Promise(resolve => setTimeout(resolve, 800));
+          generatePromises.push(
+            callGenerateApi(gridPrompts[i], uploadedImageUrl).catch(err => {
+              addDebugLog(`九宫格第${i+1}张生成失败：${(err as Error).message}`);
+              return '';
+            })
+          );
+        }
         const results = await Promise.all(generatePromises);
         actualGeneratedImages = results.filter(url => url);
         setProgress(100);
+        progressRef.current = 100;
         setGenerationStep(actualGeneratedImages.length < 9 
           ? `✅ 九宫格生成完成（${actualGeneratedImages.length}/9张成功）` 
           : '✅ 九宫格生成完成！'
         );
       }
 
-      // 生成成功
       setGeneratedImages(actualGeneratedImages);
       setIsCompleted(true);
       setIsGenerating(false);
       saveToGallery(actualGeneratedImages);
+      currentRequestInfo.current = null;
 
     } catch (err) {
       const errorMessage = (err as Error).message;
@@ -412,33 +708,65 @@ PLUS会员生成九宫格需要9个积分点，当前仅有${currentCredits}个�
       setGenerationStep(`❌ 生成失败：${errorMessage}`);
       addDebugLog(`生成异常：${errorMessage}`);
       
-      // 🔥 5. 生成失败无需本地恢复（后端扣减接口应保证：仅生成成功才扣减，失败则不扣减）
-      alert(`生成失败！错误信息：${errorMessage}`);
+      // 资源恢复逻辑
+      const requestInfo = currentRequestInfo.current;
+      if (userId && requestInfo) {
+        addDebugLog(`开始恢复扣减的资源：${requestInfo.deductType} ${requestInfo.deductNum}`);
+        let restoreSuccess = false;
+        
+        if (requestInfo.deductType === 'credits') {
+          restoreSuccess = await restoreCreditsApi(userId, requestInfo.deductNum, requestInfo.requestId);
+        } else if (requestInfo.deductType === 'rose') {
+          restoreSuccess = await restoreRoseApi(userId, requestInfo.requestId);
+        }
+        
+        if (restoreSuccess) {
+          // 恢复成功后刷新积分
+          const newProfile = await fetchLatestProfile(userId);
+          if (newProfile) {
+            setProfile(newProfile);
+            profileRef.current = newProfile;
+            await refreshPoints();
+          }
+          alert(`生成失败！已自动恢复扣减的${requestInfo.deductType === 'credits' ? '积分' : '玫瑰'}，错误信息：${errorMessage}`);
+        } else {
+          // 接口未实现时的友好提示
+          alert(`生成失败！错误信息：${errorMessage}
+资源恢复接口暂未实现，已记录您的损失（userId:${userId}，requestId:${requestInfo.requestId}），
+请联系客服并提供以上信息恢复扣减的${requestInfo.deductType === 'credits' ? '积分' : '玫瑰'}。`);
+        }
+      } else {
+        alert(`生成失败！请联系客服恢复扣减的资源，错误信息：${errorMessage}`);
+      }
+      currentRequestInfo.current = null;
     }
   }, [
     uploadedImageUrl, isGenerating, isPlus, template.id, 
     getPromptByCode, callGenerateApi, saveToGallery, addDebugLog,
-    // 🔥 新增依赖：后端扣减方法和积分数据
-    deductCredits, deductRose, profile, profileLoading
+    refreshPoints, deductCreditsApi, deductRoseApi
   ]);
 
-  // 解锁PLUS九宫格模式
   const unlockPlus = () => {
     if (isGenerating) return;
     setIsUnlocking(true);
     setTimeout(() => {
       setIsPlus(true);
-      // 🔥 注意：PLUS会员状态需从后端获取，此处仅前端展示，实际需调用后端接口
+      isPlusRef.current = true; // 同步到ref
+      setProfile(prev => {
+        const newProfile = { ...prev, isPlusMember: true };
+        profileRef.current = newProfile; // 同步到ref
+        return newProfile;
+      });
+      addDebugLog('已解锁PLUS会员（前端），可使用九宫格积分生成模式');
+      
       setIsUnlocking(false);
       setIsCompleted(false);
       setGeneratedImages([]);
-      addDebugLog('已解锁PLUS会员，可使用九宫格积分生成模式');
     }, 1200);
   };
 
   return (
     <div className="min-h-screen bg-[#FDFDFF] pb-20">
-      {/* 头部导航 */}
       <div className="bg-white/50 backdrop-blur-md sticky top-16 z-30 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center space-x-6">
@@ -466,7 +794,6 @@ PLUS会员生成九宫格需要9个积分点，当前仅有${currentCredits}个�
 
       <div className="max-w-7xl mx-auto px-6 mt-10">
         <div className="grid lg:grid-cols-12 gap-10">
-          {/* 生成结果展示区 */}
           <div className="lg:col-span-7">
             {isPlus ? (
               <GridImageGenerator 
@@ -493,9 +820,7 @@ PLUS会员生成九宫格需要9个积分点，当前仅有${currentCredits}个�
             </div>
           </div>
 
-          {/* 右侧操作区 */}
           <div className="lg:col-span-5 space-y-8">
-            {/* 生成模式选择 */}
             <div className={`relative p-8 rounded-[2.5rem] transition-all duration-500 overflow-hidden
               ${isPlus ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 shadow-amber-100' 
                 : 'bg-white border-gray-100 shadow-xl shadow-gray-100/50 border-2'}`}>
@@ -530,7 +855,7 @@ PLUS会员生成九宫格需要9个积分点，当前仅有${currentCredits}个�
                     <div>
                       <span className="text-sm font-black block">九宫格生成 
                         <span className="text-xs opacity-80">
-                          {(profile.crystalRoses || 0) > 0 ? '(消耗1玫瑰)' : '(PLUS会员消耗9积分点)'}
+                          {profile.crystalRoses > 0 ? '(消耗1玫瑰)' : '(PLUS会员消耗9积分点)'}
                         </span>
                       </span>
                       {isUnlocking && <div className="mt-1 w-full h-1 bg-black/10 rounded-full overflow-hidden">
@@ -542,9 +867,7 @@ PLUS会员生成九宫格需要9个积分点，当前仅有${currentCredits}个�
               </div>
             </div>
 
-            {/* 上传区 + 历史上传 */}
             <div className="bg-white rounded-[2.5rem] p-10 shadow-xl shadow-gray-100/50 border border-gray-50">
-              {/* 历史上传图片展示 */}
               {uploadHistory.length > 0 && (
                 <div className="mb-8">
                   <h4 className="text-sm font-black text-gray-900 mb-3">最近上传（点击直接使用）</h4>
@@ -574,7 +897,6 @@ PLUS会员生成九宫格需要9个积分点，当前仅有${currentCredits}个�
                 </div>
               )}
 
-              {/* 新文件上传按钮 */}
               <label className={`relative block group cursor-pointer rounded-[2rem] overflow-hidden border-4 border-dashed transition-all duration-500
                 ${previewUrl ? 'border-indigo-500/20 aspect-square' : 'border-gray-100 bg-gray-50/50 hover:bg-white hover:border-indigo-300 aspect-video'}`}>
                 <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} disabled={isGenerating} />
@@ -590,13 +912,12 @@ PLUS会员生成九宫格需要9个积分点，当前仅有${currentCredits}个�
                 )}
               </label>
 
-              {/* 生成按钮 */}
               <div className="mt-10 space-y-4">
                 <button 
                   onClick={startGeneration}
-                  disabled={!uploadedImageUrl || isGenerating || profileLoading}
+                  disabled={!uploadedImageUrl || isGenerating}
                   className={`w-full py-6 rounded-3xl text-lg font-black tracking-widest shadow-2xl transition-all active:scale-95 flex items-center justify-center space-x-3
-                    ${isGenerating || profileLoading ? 'bg-gray-100 text-gray-400 cursor-wait' 
+                    ${isGenerating ? 'bg-gray-100 text-gray-400 cursor-wait' 
                       : isPlus ? 'bg-black text-white hover:bg-gray-900 shadow-amber-100' 
                         : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100'}`}
                 >
@@ -608,15 +929,6 @@ PLUS会员生成九宫格需要9个积分点，当前仅有${currentCredits}个�
                         <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" />
                       </div>
                       <span className="ml-4">{progress}% 处理中</span>
-                    </>
-                  ) : profileLoading ? (
-                    <>
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                        <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                        <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" />
-                      </div>
-                      <span className="ml-4">加载积分数据...</span>
                     </>
                   ) : (
                     <>
@@ -630,7 +942,6 @@ PLUS会员生成九宫格需要9个积分点，当前仅有${currentCredits}个�
               </div>
             </div>
 
-            {/* 生成成功提示区 */}
             {isCompleted && generatedImages.length > 0 && (
               <div className="bg-emerald-500 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-emerald-100 animate-[fadeInUp_0.6s_ease-out]">
                  <h4 className="text-xl font-black mb-2">生成成功！已自动保存到图库</h4>
