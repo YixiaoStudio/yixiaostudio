@@ -101,27 +101,29 @@ const Home: React.FC = () => {
            <span className="text-xs font-bold text-gray-400">实时热度更新中</span>
         </div>
         
-        <div className="flex overflow-x-auto pb-8 gap-6 px-4 no-scrollbar scroll-smooth">
-           {topRecommendations.map((t, idx) => (
-             <div 
-               key={`top-${t.id}`} 
-               onClick={() => navigate(`/template/${t.id}`)}
-               className="flex-none w-64 md:w-80 group cursor-pointer"
-             >
-                <div className="relative aspect-[3/4] rounded-[2.5rem] overflow-hidden shadow-xl group-hover:shadow-2xl transition-all duration-500">
-                   <img src={t.coverImage} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="top" />
-                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                   <div className="absolute top-6 left-6 w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-white font-black border border-white/30 italic">
-                      #{idx + 1}
-                   </div>
-                   <div className="absolute bottom-6 left-6 right-6">
-                      <h3 className="text-white font-black text-lg truncate">{t.title}</h3>
-                      <p className="text-white/60 text-[10px] font-bold mt-1 uppercase tracking-widest">{t.usageCount} 人参与创作</p>
-                   </div>
-                </div>
-             </div>
-           ))}
+      <div className="flex overflow-x-auto pb-8 gap-6 px-4 no-scrollbar scroll-smooth">
+  {topRecommendations.map((t, idx) => (
+    <div 
+      key={`top-${t.id}`} 
+      onClick={() => navigate(`/template/${t.id}`)}
+      className="flex-none w-64 md:w-80 group cursor-pointer"
+    >
+      <div className="relative aspect-[3/4] rounded-[2.5rem] overflow-hidden shadow-xl group-hover:shadow-2xl transition-all duration-500">
+        <img src={t.coverImage} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="top" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+        {/* 核心修改：缩小火焰和数字的间距（mr-1 → mr-0） */}
+        <div className="absolute top-3 right-6 w-12 h-12 bg-black/50 backdrop-blur-md rounded-2xl flex items-center justify-center text-white font-black border border-white/30 shadow-lg group-hover:scale-110 transition-all duration-300">
+          <span className="mr-0 text-sm">🔥</span>
+          <span className="italic">{idx + 1}</span>
         </div>
+        <div className="absolute bottom-6 left-6 right-6">
+          <h3 className="text-white font-black text-lg truncate">{t.title}</h3>
+          <p className="text-white/60 text-[10px] font-bold mt-1 uppercase tracking-widest">{t.usageCount} 人参与创作</p>
+        </div>
+      </div>
+    </div>
+  ))}
+</div>
       </section>
 
       {/* 旅拍入口卡片 */}

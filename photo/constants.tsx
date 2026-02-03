@@ -1,4 +1,3 @@
-
 import { Template, DailyTask } from './types';
 
 // 任务配置
@@ -27,7 +26,6 @@ const travelTemplates: Template[] = [
     subtitle: '法式优雅与浪漫之都',
     description: '以埃菲尔铁塔为背景，捕捉清晨的第一缕阳光，展现极致的法式慵懒。',
     coverImage: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/paris${i}/400/500`),
     tags: ['巴黎', '法式', '浪漫'],
     coordinates: { lat: 48.8566, lng: 2.3522 },
     usageCount: 8902
@@ -40,7 +38,6 @@ const travelTemplates: Template[] = [
     subtitle: '一眼万年的东方古韵',
     description: '身着汉服漫步在故宫红墙下，感受紫禁城的庄严与雪景的静谧。',
     coverImage: 'https://images.unsplash.com/photo-1599571234909-29ed5d1321d6?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/beijing${i}/400/500`),
     tags: ['北京', '故宫', '古风'],
     coordinates: { lat: 39.9042, lng: 116.4074 },
     usageCount: 15400
@@ -53,7 +50,6 @@ const travelTemplates: Template[] = [
     subtitle: '永不熄灭的都市霓虹',
     description: '在繁华的时代广场，捕捉全球潮流的脉动。',
     coverImage: 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/ny${i}/400/500`),
     tags: ['纽约', '时尚', '都市'],
     coordinates: { lat: 40.7128, lng: -74.0060 },
     usageCount: 12000
@@ -66,7 +62,6 @@ const travelTemplates: Template[] = [
     subtitle: '英伦贵族的优雅沉淀',
     description: '在大本钟与红色双层巴士的映衬下，开启一段复古的英伦旅程。',
     coverImage: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/london${i}/400/500`),
     tags: ['伦敦', '英伦', '复古'],
     coordinates: { lat: 51.5074, lng: -0.1278 },
     usageCount: 9800
@@ -79,7 +74,6 @@ const travelTemplates: Template[] = [
     subtitle: '废墟之上的艺术巅峰',
     description: '在斗兽场与特莱维喷泉旁，追寻罗马假日的浪漫回忆。',
     coverImage: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/rome${i}/400/500`),
     tags: ['罗马', '文艺', '电影感'],
     coordinates: { lat: 41.9028, lng: 12.4964 },
     usageCount: 7600
@@ -92,7 +86,6 @@ const travelTemplates: Template[] = [
     subtitle: '上帝掉落在海里的调色盘',
     description: '纯白的建筑与湛蓝的海水交织，定格最唯美的海岛度假风。',
     coverImage: 'https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/greece${i}/400/500`),
     tags: ['希腊', '海岛', '清新'],
     coordinates: { lat: 36.3932, lng: 25.4615 },
     usageCount: 11000
@@ -105,7 +98,6 @@ const travelTemplates: Template[] = [
     subtitle: '赤道南纬 8 度的私藏',
     description: '在乌布的秋千上飞越丛林，感受巴厘岛的野性与纯净。',
     coverImage: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/bali${i}/400/500`),
     tags: ['巴厘岛', '度假', '自然'],
     coordinates: { lat: -8.4095, lng: 115.1889 },
     usageCount: 13400
@@ -118,7 +110,6 @@ const travelTemplates: Template[] = [
     subtitle: '沙漠与科技的交响',
     description: '在哈利法塔顶俯瞰云端，或是骑着骆驼横跨漫天金黄的沙海。',
     coverImage: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/dubai${i}/400/500`),
     tags: ['迪拜', '奢华', '科幻'],
     coordinates: { lat: 25.2048, lng: 55.2708 },
     usageCount: 8800
@@ -131,7 +122,6 @@ const travelTemplates: Template[] = [
     subtitle: '赛博都市的潮流巅峰',
     description: '置身于东京繁华街头，感受霓虹灯影下的时尚脉搏。',
     coverImage: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/tokyo${i}/400/500`),
     tags: ['东京', '潮流', '都市'],
     coordinates: { lat: 35.6762, lng: 139.6503 },
     usageCount: 12450
@@ -144,7 +134,6 @@ const travelTemplates: Template[] = [
     subtitle: '韩流与传统的碰撞',
     description: '穿上精美的韩服，在景福宫的长廊间留下动人瞬间。',
     coverImage: 'https://images.unsplash.com/photo-1517154421773-0529f29ea451?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/seoul${i}/400/500`),
     tags: ['首尔', '韩系', '氛围'],
     coordinates: { lat: 37.5665, lng: 126.9780 },
     usageCount: 9500
@@ -157,7 +146,6 @@ const travelTemplates: Template[] = [
     subtitle: '暹罗王朝的璀璨遗产',
     description: '在精美绝伦的泰式神庙中，定格极具异域色彩的奢华写真。',
     coverImage: 'https://images.unsplash.com/photo-1504966981333-1cf345c47314?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/bangkok${i}/400/500`),
     tags: ['曼谷', '泰式', '异域'],
     coordinates: { lat: 13.7563, lng: 100.5018 },
     usageCount: 10200
@@ -170,7 +158,6 @@ const travelTemplates: Template[] = [
     subtitle: '冰雪王国的童话梦',
     description: '以洋葱头教堂为背景，展现大气磅礴的东欧贵族气质。',
     coverImage: 'https://images.unsplash.com/photo-1513326738677-b964603b136d?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/moscow${i}/400/500`),
     tags: ['莫斯科', '硬核', '宏伟'],
     coordinates: { lat: 55.7558, lng: 37.6173 },
     usageCount: 6700
@@ -183,7 +170,6 @@ const travelTemplates: Template[] = [
     subtitle: '跨越千年的时空对话',
     description: '在漫天黄沙中，与世界奇迹合影，寻找神秘的法老印记。',
     coverImage: 'https://images.unsplash.com/photo-1503177119275-0aa32b3a9368?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/egypt${i}/400/500`),
     tags: ['埃及', '沙漠', '神秘'],
     coordinates: { lat: 30.0444, lng: 31.2357 },
     usageCount: 5400
@@ -196,7 +182,6 @@ const travelTemplates: Template[] = [
     subtitle: '南半球的阳光海岸',
     description: '在歌剧院与海港大桥前，享受最纯正的澳洲蓝天与白帆。',
     coverImage: 'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/sydney${i}/400/500`),
     tags: ['悉尼', '海港', '现代'],
     coordinates: { lat: -33.8688, lng: 151.2093 },
     usageCount: 8200
@@ -209,23 +194,32 @@ const travelTemplates: Template[] = [
     subtitle: '离天空最近的雪境',
     description: '在圣洁的雪山之巅，记录如同精灵般的纯粹美感。',
     coverImage: 'https://images.unsplash.com/photo-1531310197839-ccf54634509e?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/swiss${i}/400/500`),
     tags: ['瑞士', '雪景', '治愈'],
     coordinates: { lat: 46.5475, lng: 7.9854 },
     usageCount: 14500
   },
   {
     id: '0001',
+    category: '女神',
+    title: '滑雪实验室',
+    subtitle: '雪道飞驰的冬日欢歌',
+    description: ' 身着滑雪服，驰骋在银装素裹的雪场，尽享冬日运动的酣畅快意。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0001.jpg',
+    tags: ['滑雪','雪场','冬日'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 18900
+  },
+    {
+    id: '0004',
     category: '旅拍',
     title: '梦回长安不夜城',
     locationName: '中国 · 西安',
     subtitle: '大唐盛世的万家灯火',
     description: '身着襦裙，置身不夜城的流光溢彩中，重现盛唐风华。',
     coverImage: 'https://images.unsplash.com/photo-1582268611958-ebad17159ed7?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/xian${i}/400/500`),
     tags: ['西安', '盛唐', '汉服'],
     coordinates: { lat: 34.3416, lng: 108.9398 },
-    usageCount: 18900
+    usageCount: 10
   },
   {
     id: 'travel-chengdu',
@@ -235,7 +229,6 @@ const travelTemplates: Template[] = [
     subtitle: '烟火气中的时尚之都',
     description: '在古香古色的川西民居中，捕捉独属于成都的慢节奏优雅。',
     coverImage: 'https://images.unsplash.com/photo-1541417129705-0e31be03df6c?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/chengdu${i}/400/500`),
     tags: ['成都', '巷弄', '川蜀'],
     coordinates: { lat: 30.5728, lng: 104.0668 },
     usageCount: 14200
@@ -248,7 +241,6 @@ const travelTemplates: Template[] = [
     subtitle: '江南烟雨的极致柔情',
     description: '在苏堤与雷峰塔的掩映下，定格如水墨画般的江南写真。',
     coverImage: 'https://images.unsplash.com/photo-1581414436531-155452f36d1f?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/hangzhou${i}/400/500`),
     tags: ['杭州', '西湖', '唯美'],
     coordinates: { lat: 30.2741, lng: 120.1551 },
     usageCount: 11500
@@ -261,7 +253,6 @@ const travelTemplates: Template[] = [
     subtitle: '风花雪月的自在生活',
     description: '站在洱海的S湾，任海风吹乱发丝，定格最纯粹的森系大片。',
     coverImage: 'https://images.unsplash.com/photo-1591147139223-9993309e3215?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/dali${i}/400/500`),
     tags: ['大理', '洱海', '文艺'],
     coordinates: { lat: 25.6065, lng: 100.2676 },
     usageCount: 16700
@@ -274,10 +265,29 @@ const travelTemplates: Template[] = [
     subtitle: '世界屋脊的信仰之光',
     description: '在圣洁的布达拉宫广场前，留下一生一次的西藏记忆。',
     coverImage: 'https://images.unsplash.com/photo-1541542684-d2d91df5185d?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/lhasa${i}/400/500`),
     tags: ['拉萨', '民族', '震撼'],
     coordinates: { lat: 29.6469, lng: 91.1172 },
     usageCount: 13900
+  },
+    {
+    id: '0002',
+    category: '男孩',
+    title: '儿童未来职业照',
+    subtitle: '童心筑梦的职业畅想',
+    description: '身着职业装，置身专属职业场景，定格童年的美好职业期许',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0002.jpg',
+    tags: ['儿童职业照','童梦启航','成长纪念'],
+    usageCount: 17800
+  },
+      {
+    id: '0003',
+    category: '女孩',
+    title: '儿童未来职业照',
+    subtitle: '童心筑梦的职业畅想',
+    description: '身着职业装，置身专属职业场景，定格童年的美好职业期许',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0003.jpg',
+    tags: ['儿童职业照','童梦启航','成长纪念'],
+    usageCount: 17800
   },
   {
     id: 'travel-hongkong',
@@ -287,10 +297,9 @@ const travelTemplates: Template[] = [
     subtitle: '东方之珠的怀旧胶片',
     description: '天星小轮与摩天大楼交错，定格极具王家卫风格的胶片质感。',
     coverImage: 'https://images.unsplash.com/photo-1506501139174-099022df5260?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/hk${i}/400/500`),
     tags: ['香港', '胶片', '复古'],
     coordinates: { lat: 22.3193, lng: 114.1694 },
-    usageCount: 17800
+    usageCount: 10
   },
   {
     id: 'travel-iceland',
@@ -300,7 +309,6 @@ const travelTemplates: Template[] = [
     subtitle: '地球上最像外星的地方',
     description: '在冰岛的旷野中，与绚丽极光共舞，记录跨越时空的壮丽美感。',
     coverImage: 'https://images.unsplash.com/photo-1476610182048-b716b8518aae?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/iceland${i}/400/500`),
     tags: ['冰岛', '极光', '壮丽'],
     coordinates: { lat: 64.1265, lng: -21.8174 },
     usageCount: 5670
@@ -313,7 +321,6 @@ const travelTemplates: Template[] = [
     subtitle: '摩登东方的交响乐',
     description: '在外滩的长廊上，看浦江两岸的建筑交叠，感受魔都的无限魅力。',
     coverImage: 'https://images.unsplash.com/photo-1474181487882-5abf3f0ba6c2?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/shanghai${i}/400/500`),
     tags: ['上海', '外滩', '摩登'],
     coordinates: { lat: 31.2304, lng: 121.4737 },
     usageCount: 15800
@@ -326,7 +333,6 @@ const travelTemplates: Template[] = [
     subtitle: '狂欢之都的无限热望',
     description: '在科科瓦多山顶，张开双臂迎接南美洲最热情的阳光。',
     coverImage: 'https://images.unsplash.com/photo-1483729558449-99ef09a8c325?auto=format&fit=crop&q=80&w=800',
-    exampleImages: Array.from({ length: 9 }, (_, i) => `https://picsum.photos/seed/rio${i}/400/500`),
     tags: ['里约', '耶稣像', '热情'],
     coordinates: { lat: -22.9519, lng: -43.2105 },
     usageCount: 4200
@@ -348,7 +354,6 @@ const generateTemplates = (): Template[] => {
       subtitle: isLimited ? '稀有艺术风格' : 'AI 智能生成',
       description: `为您设计的专属${category}风格。`,
       coverImage: `https://picsum.photos/seed/${id}/400/533`,
-      exampleImages: Array.from({ length: 9 }, (_, j) => `https://picsum.photos/seed/${id}-${j}/200/250`),
       tags: isLimited ? ['限定', '高级'] : ['写真'],
       isHot: i % 5 === 0,
       isLimited,
