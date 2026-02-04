@@ -163,37 +163,37 @@ const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  // 封装领取Credits的函数（原有逻辑不变）
-  const handleClaimCredits = async () => {
-    if (claimLoading.credits) return;
-    setClaimLoading(prev => ({ ...prev, credits: true }));
-    try {
-      await claimCredits();
-      updateHeaderData();
-      alert('每日Credits领取成功！');
-    } catch (error) {
-      console.error('领取Credits失败:', error);
-      alert('领取失败，请稍后重试');
-    } finally {
-      setClaimLoading(prev => ({ ...prev, credits: false }));
-    }
-  };
-
-  // 封装领取玫瑰的函数（原有逻辑不变）
-  const handleClaimRose = async () => {
-    if (claimLoading.rose) return;
-    setClaimLoading(prev => ({ ...prev, rose: true }));
-    try {
-      await claimRose();
-      updateHeaderData();
-      alert('每日玫瑰领取成功！');
-    } catch (error) {
-      console.error('领取玫瑰失败:', error);
-      alert('领取失败，请稍后重试');
-    } finally {
-      setClaimLoading(prev => ({ ...prev, rose: false }));
-    }
-  };
+  // 封装领取Credits的函数（精简弹窗：移除重复的alert提示）
+const handleClaimCredits = async () => {
+  if (claimLoading.credits) return;
+  setClaimLoading(prev => ({ ...prev, credits: true }));
+  try {
+    await claimCredits(); // 核心领取逻辑（提示语移到PointsManager中）
+    updateHeaderData();
+    // 移除这里的alert提示，避免重复弹窗
+  } catch (error) {
+    console.error('领取Credits失败:', error);
+    // 保留失败提示（如果PointsManager中未处理失败场景）
+    alert('领取失败，请稍后重试');
+  } finally {
+    setClaimLoading(prev => ({ ...prev, credits: false }));
+  }
+};
+// 封装领取玫瑰的函数（精简弹窗：移除所有alert，由PointsManager统一处理）
+const handleClaimRose = async () => {
+  if (claimLoading.rose) return;
+  setClaimLoading(prev => ({ ...prev, rose: true }));
+  try {
+    await claimRose(); // 核心领取逻辑（所有提示移到PointsManager中）
+    updateHeaderData();
+    // 完全移除成功alert，由PointsManager显示唯一提示
+  } catch (error) {
+    console.error('领取玫瑰失败:', error);
+    // 完全移除失败alert，由PointsManager显示唯一提示
+  } finally {
+    setClaimLoading(prev => ({ ...prev, rose: false }));
+  }
+};
 
   const closeModal = () => {
     setIsPlusModalOpen(false);

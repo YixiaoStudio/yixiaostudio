@@ -10,6 +10,8 @@ interface Props {
   isCompleted: boolean;
   images: string[];
   uploadedImageUrl: string;
+  // ========== 新增：添加onImageClick属性定义 ==========
+  onImageClick?: (imageUrl: string) => void;
 }
 
 const SingleImageGenerator: React.FC<Props> = ({ 
@@ -19,7 +21,9 @@ const SingleImageGenerator: React.FC<Props> = ({
   generationStep, 
   isCompleted, 
   images,
-  uploadedImageUrl
+  uploadedImageUrl,
+  // ========== 新增：接收onImageClick属性 ==========
+  onImageClick
 }) => {
   return (
     <div className="bg-white rounded-[3rem] p-10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.06)] border border-gray-100 relative overflow-hidden group min-h-[600px] flex flex-col">
@@ -44,7 +48,14 @@ const SingleImageGenerator: React.FC<Props> = ({
           ${!isCompleted ? 'bg-gray-50/50 border-2 border-dashed border-gray-100' : 'shadow-[0_40px_80px_rgba(0,0,0,0.1)] hover:scale-[1.02] border border-gray-50'}
         `}>
           {isCompleted ? (
-            <img src={images[0]} className="w-full h-full object-cover animate-fade-in" alt="result" />
+            // ========== 核心修改：给图片添加点击事件和鼠标样式 ==========
+            <img 
+              src={images[0]} 
+              className="w-full h-full object-cover animate-fade-in cursor-pointer" // 新增cursor-pointer
+              alt="result"
+              // 点击时触发父组件传递的onImageClick事件
+              onClick={() => onImageClick && onImageClick(images[0])} 
+            />
           ) : isGenerating ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[2px]">
               <div className="w-full h-full animate-[pulse_2s_infinite] bg-indigo-400/5" />

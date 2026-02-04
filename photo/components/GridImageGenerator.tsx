@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Template } from '../types';
 
@@ -9,6 +8,8 @@ interface Props {
   isCompleted: boolean;
   images: string[];
   template: Template;
+  // ========== 新增：添加onImageClick属性定义 ==========
+  onImageClick?: (imageUrl: string) => void;
 }
 
 const GridImageGenerator: React.FC<Props> = ({ 
@@ -17,7 +18,9 @@ const GridImageGenerator: React.FC<Props> = ({
   generationStep, 
   isCompleted, 
   images, 
-  template 
+  template,
+  // ========== 新增：接收onImageClick属性 ==========
+  onImageClick
 }) => {
   return (
     <div className="bg-white rounded-[3rem] p-8 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.08)] border border-amber-100 relative overflow-hidden group min-h-[600px] flex flex-col">
@@ -46,7 +49,15 @@ const GridImageGenerator: React.FC<Props> = ({
             `}
           >
             {isCompleted ? (
-              <img src={img} className="w-full h-full object-cover animate-fade-in" style={{ animationDelay: `${i * 0.1}s` }} alt="result" />
+              // ========== 核心修改：给九宫格图片添加点击事件和鼠标样式 ==========
+              <img 
+                src={img} 
+                className="w-full h-full object-cover animate-fade-in cursor-pointer" // 新增cursor-pointer
+                style={{ animationDelay: `${i * 0.1}s` }} 
+                alt={`result-${i+1}`}
+                // 点击时触发父组件传递的onImageClick事件，传递当前图片URL
+                onClick={() => onImageClick && onImageClick(img)} 
+              />
             ) : isGenerating ? (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-full h-full animate-[pulse_3s_infinite] bg-amber-400/10" style={{ animationDelay: `${i * 0.2}s` }} />

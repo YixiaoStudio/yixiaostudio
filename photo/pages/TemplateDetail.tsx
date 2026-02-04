@@ -8,7 +8,23 @@ import { PointsProfile } from '../components/PointsManager';
 import { PointsRefreshContext } from '../App';
 import { saveGeneratedImageToServer } from './MyGallery';
 
-// API配置
+// ========== 新增：子组件Props类型定义（解决属性未定义问题） ==========
+type ImageGeneratorCommonProps = {
+  isGenerating: boolean;
+  progress: number;
+  generationStep: string;
+  isCompleted: boolean;
+  images: string[];
+  template: typeof TEMPLATES[0];
+  uploadedImageUrl: string;
+  onImageClick?: (imageUrl: string) => void; // 新增onImageClick属性定义
+};
+
+// 类型断言：确保子组件接收onImageClick属性（如果子组件未定义，先临时断言）
+const SingleImageGeneratorWithClick = SingleImageGenerator as React.FC<ImageGeneratorCommonProps>;
+const GridImageGeneratorWithClick = GridImageGenerator as React.FC<ImageGeneratorCommonProps>;
+
+// API配置（原有代码不变）
 const VOLC_API_BASE = 'https://sd5j17d5mg7k3v1e7vu60.apigateway-cn-beijing.volceapi.com'; 
 const UPLOAD_API = VOLC_API_BASE + '/api/upload-to-tos';
 const GENERATE_API = VOLC_API_BASE + '/api/generate-image';
@@ -16,26 +32,24 @@ const CONVERTER_API = VOLC_API_BASE + '/api/get-prompt-by-code';
 const USER_IMAGES_API = VOLC_API_BASE + '/api/get-user-images';
 const POINTS_API_BASE_URL = 'https://sd5r3ie17n7a7iuta91j0.apigateway-cn-beijing.volceapi.com/api/points';
 
-// ========== 临时方案：接口未实现时的降级处理 ==========
+// ========== 临时方案：接口未实现时的降级处理（原有代码不变） ==========
 const restoreCreditsApi = async (userId: number, num: number, requestId: string): Promise<boolean> => {
   console.warn(`[临时提示] 恢复积分接口未实现（404），userId:${userId}, num:${num}, requestId:${requestId}`);
-  // 记录失败日志，供后端人工处理
   localStorage.setItem(`restore_credits_${Date.now()}`, JSON.stringify({
     userId, num, requestId, time: new Date().toISOString()
   }));
-  return false; // 返回false，走人工提示流程
+  return false;
 };
 
 const restoreRoseApi = async (userId: number, requestId: string): Promise<boolean> => {
   console.warn(`[临时提示] 恢复玫瑰接口未实现（404），userId:${userId}, requestId:${requestId}`);
-  // 记录失败日志，供后端人工处理
   localStorage.setItem(`restore_rose_${Date.now()}`, JSON.stringify({
     userId, requestId, time: new Date().toISOString()
   }));
-  return false; // 返回false，走人工提示流程
+  return false;
 };
 
-// ========== 工具函数 ==========
+// ========== 工具函数（原有代码不变） ==========
 const requestPointsApi = async (userId: number, url: string, options: RequestInit = {}) => {
   try {
     const userIdStr = String(userId);
@@ -53,7 +67,6 @@ const requestPointsApi = async (userId: number, url: string, options: RequestIni
       credentials: 'include'
     });
     
-    // 新增：处理404/非JSON响应
     if (!res.ok) {
       console.error(`积分接口请求失败，状态码：${res.status}`);
       return { success: false, msg: `接口请求失败（${res.status}）` };
@@ -153,8 +166,7 @@ const TemplateDetail: React.FC = () => {
   const navigate = useNavigate();
   const template = TEMPLATES.find(t => t.id === id);
   
-  // ========== 基础状态声明（调整顺序：先声明state，再声明ref） ==========
-  // 1. 积分信息状态
+  // ========== 基础状态声明（原有代码不变） ==========
   const [profile, setProfile] = useState<PointsProfile>({
     points: 0,
     credits: 0,
@@ -164,10 +176,7 @@ const TemplateDetail: React.FC = () => {
     lastCreditsClaimDate: ''
   });
 
-  // 2. PLUS会员状态（🔥 修复：先声明isPlus，再声明isPlusRef）
   const [isPlus, setIsPlus] = useState(false);
-  
-  // 3. 其他基础状态
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -181,14 +190,16 @@ const TemplateDetail: React.FC = () => {
   const [uploadHistory, setUploadHistory] = useState<UploadHistoryItem[]>([]);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<UploadHistoryItem | null>(null);
 
-  // ========== Ref声明（必须在对应的state之后） ==========
-  // 🔥 修复：isPlusRef初始化在isPlus声明之后，避免"未初始化"错误
+  // ========== 新增：大图预览相关状态（原有代码不变） ==========
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentPreviewImage, setCurrentPreviewImage] = useState<string>('');
+
+  // ========== Ref声明（原有代码不变） ==========
   const isPlusRef = useRef(isPlus);
   const profileRef = useRef<PointsProfile>(profile);
   const progressRef = useRef(0);
   const setProgressRef = useRef<(value: React.SetStateAction<number>) => void>(() => {});
   
-  // 其他ref
   const requestIdRef = useRef<string>('');
   const currentRequestInfo = useRef<{
     requestId: string;
@@ -198,15 +209,41 @@ const TemplateDetail: React.FC = () => {
   const savedImageUrls = useRef<Set<string>>(new Set());
   const syncTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Context引用（放在ref之前/之后都可，不影响）
   const { refreshPoints } = useContext(PointsRefreshContext);
 
-  // ========== 同步ref和状态 ==========
+  // ========== 同步ref和状态（原有代码不变） ==========
   useEffect(() => {
     isPlusRef.current = isPlus;
     profileRef.current = profile;
     setProgressRef.current = setProgress;
   }, [isPlus, profile, setProgress]);
+
+  // ========== 新增：大图预览相关逻辑（原有代码不变） ==========
+  const handleImageClick = useCallback((imageUrl: string) => {
+    setCurrentPreviewImage(imageUrl);
+    setIsModalOpen(true);
+    document.body.style.overflow = 'hidden';
+  }, []);
+
+  const closeImageModal = useCallback(() => {
+    setIsModalOpen(false);
+    setCurrentPreviewImage('');
+    document.body.style.overflow = 'auto';
+  }, []);
+
+  useEffect(() => {
+    const handleEscKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isModalOpen) {
+        closeImageModal();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscKey);
+    return () => {
+      window.removeEventListener('keydown', handleEscKey);
+      document.body.style.overflow = 'auto';
+    };
+  }, [isModalOpen, closeImageModal]);
 
   useEffect(() => {
     const initProfileAndImages = async () => {
@@ -215,7 +252,7 @@ const TemplateDetail: React.FC = () => {
         const latestProfile = await fetchLatestProfile(userId);
         if (latestProfile) {
           setProfile(latestProfile);
-          profileRef.current = latestProfile; // 同步到ref
+          profileRef.current = latestProfile;
         }
 
         const serverHistory = await fetchUserImages(userId);
@@ -242,11 +279,11 @@ const TemplateDetail: React.FC = () => {
 
     initProfileAndImages();
     
-    // 组件卸载时清理
     return () => {
       savedImageUrls.current.clear();
       currentRequestInfo.current = null;
       if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+      document.body.style.overflow = 'auto';
     };
   }, []);
 
@@ -386,7 +423,7 @@ const TemplateDetail: React.FC = () => {
     }
   }, [fileToBase64, uploadImageToTOS]);
 
-  // ========== 修复Hook错误：重构callGenerateApi，避免在异步中直接调用Hook ==========
+  // ========== 修复Hook错误：重构callGenerateApi（原有代码不变） ==========
   const callGenerateApi = useCallback(async (tag: string, imageUrl: string): Promise<string> => {
     const userId = getCurrentUserId();
     if (!userId) {
@@ -396,7 +433,6 @@ const TemplateDetail: React.FC = () => {
     const requestId = `single_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     requestIdRef.current = requestId;
     
-    // 使用ref中的状态，避免直接引用Hook状态
     const currentIsPlus = isPlusRef.current;
     const currentProfile = profileRef.current;
     currentRequestInfo.current = {
@@ -468,7 +504,6 @@ const TemplateDetail: React.FC = () => {
                   const data = JSON.parse(dataStr);
                   if (data.url) {
                     resultImageUrl = data.url;
-                    // 使用ref中的setProgress，避免直接调用Hook
                     if (setProgressRef.current) {
                       setProgressRef.current(prev => Math.min(prev + 10, 100));
                     }
@@ -493,11 +528,10 @@ const TemplateDetail: React.FC = () => {
     });
   }, [addDebugLog]);
 
-  // ========== 修复重复保存：加强幂等性控制（终极版） ==========
+  // ========== 修复重复保存：加强幂等性控制（原有代码不变） ==========
   const saveToGallery = useCallback((images: string[]) => {
     if (images.length === 0) return;
     
-    // 1. 内存级去重 + 检查是否已保存过
     const uniqueImages = Array.from(new Set(images)).filter(url => {
       const isNew = !savedImageUrls.current.has(url);
       if (isNew) savedImageUrls.current.add(url);
@@ -515,13 +549,11 @@ const TemplateDetail: React.FC = () => {
       templateTitle: template.title,
       images: uniqueImages,
       timestamp: new Date().toISOString(),
-      isPlus: isPlusRef.current, // 使用ref状态
+      isPlus: isPlusRef.current,
       originalImage: { tosUrl: uploadedImageUrl, source: selectedHistoryItem ? 'history' : 'upload' }
     };
     
-    // 2. 本地存储级去重（彻底防止重复）
     const saved: GalleryItem[] = JSON.parse(localStorage.getItem('ai-photo-gallery') || '[]');
-    // 🔥 修复：更严格的去重逻辑 - 检查每张图片URL是否已存在
     const urlExistsInLocal = uniqueImages.some(newUrl => 
       saved.some(savedItem => savedItem.images.includes(newUrl))
     );
@@ -531,16 +563,12 @@ const TemplateDetail: React.FC = () => {
       return;
     }
     
-    // 3. 保存到本地存储
     const updatedSaved = [newItem, ...saved];
     localStorage.setItem('ai-photo-gallery', JSON.stringify(updatedSaved));
     
-    // 4. 同步到后端（加强防抖，确保只执行一次）
     const userId = getCurrentUserId();
     if (userId) {
-      // 🔥 修复：先清除旧的定时器，避免重复执行
       if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-      // 防抖1秒，避免短时间内多次调用
       syncTimerRef.current = setTimeout(() => {
         saveGeneratedImageToServer(userId, newItem)
           .then(success => {
@@ -560,7 +588,7 @@ const TemplateDetail: React.FC = () => {
     addDebugLog(`生成成功！${uniqueImages.length}张图片已自动保存到图库`);
   }, [uploadedImageUrl, selectedHistoryItem, addDebugLog, template.id, template.title]);
 
-  // ========== 核心逻辑：生成图片 + 错误处理 ==========
+  // ========== 核心逻辑：生成图片 + 错误处理（原有代码不变） ==========
   const startGeneration = useCallback(async () => {
     if (!uploadedImageUrl) { 
       alert('请先上传图片或选择历史图片！'); 
@@ -588,7 +616,6 @@ const TemplateDetail: React.FC = () => {
     let deductType: 'credits' | 'rose' = 'credits';
     let deductNum = 1;
 
-    // 扣减逻辑
     if (!isPlus) {
       if (currentCredits < 1) {
         alert(`积分不足！
@@ -639,13 +666,11 @@ PLUS会员生成九宫格需要9个积分点。
       const newProfile = await fetchLatestProfile(userId);
       if (newProfile) {
         setProfile(newProfile);
-        profileRef.current = newProfile; // 同步到ref
+        profileRef.current = newProfile;
         try {
-          // 优先调用Context刷新，不触发storage事件
           await refreshPoints();
         } catch (e) {
           console.log('Context刷新失败，使用localStorage标记（仅存储，不触发事件）:', e);
-          // 🔥 修复：只存储标记，不触发事件，避免循环
           localStorage.setItem('ai_points_need_refresh', '1');
         }
       }
@@ -655,7 +680,7 @@ PLUS会员生成九宫格需要9个积分点。
       setIsGenerating(true);
       setIsCompleted(false);
       setProgress(0);
-      progressRef.current = 0; // 同步到ref
+      progressRef.current = 0;
       setErrorMsg('');
       setGeneratedImages([]);
       setGenerationStep('AI正在绘制您的写真');
@@ -673,10 +698,8 @@ PLUS会员生成九宫格需要9个积分点。
       } else {
         const gridPrompts = promptData as string[];
         setGenerationStep('九宫格生成中（共9张）...');
-        // 限制并发数，避免重复请求
         const generatePromises = [];
         for (let i = 0; i < gridPrompts.length; i++) {
-          // 每个请求间隔800ms，减少后端压力
           await new Promise(resolve => setTimeout(resolve, 800));
           generatePromises.push(
             callGenerateApi(gridPrompts[i], uploadedImageUrl).catch(err => {
@@ -708,7 +731,6 @@ PLUS会员生成九宫格需要9个积分点。
       setGenerationStep(`❌ 生成失败：${errorMessage}`);
       addDebugLog(`生成异常：${errorMessage}`);
       
-      // 资源恢复逻辑
       const requestInfo = currentRequestInfo.current;
       if (userId && requestInfo) {
         addDebugLog(`开始恢复扣减的资源：${requestInfo.deductType} ${requestInfo.deductNum}`);
@@ -721,7 +743,6 @@ PLUS会员生成九宫格需要9个积分点。
         }
         
         if (restoreSuccess) {
-          // 恢复成功后刷新积分
           const newProfile = await fetchLatestProfile(userId);
           if (newProfile) {
             setProfile(newProfile);
@@ -730,7 +751,6 @@ PLUS会员生成九宫格需要9个积分点。
           }
           alert(`生成失败！已自动恢复扣减的${requestInfo.deductType === 'credits' ? '积分' : '玫瑰'}，错误信息：${errorMessage}`);
         } else {
-          // 接口未实现时的友好提示
           alert(`生成失败！错误信息：${errorMessage}
 资源恢复接口暂未实现，已记录您的损失（userId:${userId}，requestId:${requestInfo.requestId}），
 请联系客服并提供以上信息恢复扣减的${requestInfo.deductType === 'credits' ? '积分' : '玫瑰'}。`);
@@ -751,10 +771,10 @@ PLUS会员生成九宫格需要9个积分点。
     setIsUnlocking(true);
     setTimeout(() => {
       setIsPlus(true);
-      isPlusRef.current = true; // 同步到ref
+      isPlusRef.current = true;
       setProfile(prev => {
         const newProfile = { ...prev, isPlusMember: true };
-        profileRef.current = newProfile; // 同步到ref
+        profileRef.current = newProfile;
         return newProfile;
       });
       addDebugLog('已解锁PLUS会员（前端），可使用九宫格积分生成模式');
@@ -795,17 +815,28 @@ PLUS会员生成九宫格需要9个积分点。
       <div className="max-w-7xl mx-auto px-6 mt-10">
         <div className="grid lg:grid-cols-12 gap-10">
           <div className="lg:col-span-7">
+            {/* ========== 关键修正：移除行尾注释，使用类型断言后的组件 ========== */}
             {isPlus ? (
-              <GridImageGenerator 
-                isGenerating={isGenerating} progress={progress} generationStep={generationStep}
-                isCompleted={isCompleted} images={generatedImages} template={template}
+              <GridImageGeneratorWithClick 
+                isGenerating={isGenerating}
+                progress={progress}
+                generationStep={generationStep}
+                isCompleted={isCompleted}
+                images={generatedImages}
+                template={template}
                 uploadedImageUrl={uploadedImageUrl}
+                onImageClick={handleImageClick}
               />
             ) : (
-              <SingleImageGenerator 
-                isGenerating={isGenerating} progress={progress} generationStep={generationStep}
-                isCompleted={isCompleted} images={generatedImages} template={template}
+              <SingleImageGeneratorWithClick 
+                isGenerating={isGenerating}
+                progress={progress}
+                generationStep={generationStep}
+                isCompleted={isCompleted}
+                images={generatedImages}
+                template={template}
                 uploadedImageUrl={uploadedImageUrl}
+                onImageClick={handleImageClick}
               />
             )}
             <div className="mt-6 bg-white rounded-3xl p-6 border border-gray-100 flex items-center justify-between shadow-sm">
@@ -970,6 +1001,35 @@ PLUS会员生成九宫格需要9个积分点。
           </div>
         </div>
       </div>
+
+      {/* 大图预览模态框（原有代码不变） */}
+      {isModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+          onClick={closeImageModal}
+        >
+          <div 
+            className="relative max-w-7xl max-h-[90vh] w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={closeImageModal}
+              className="absolute top-4 right-4 z-10 w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white/40 transition-all"
+              aria-label="关闭大图预览"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <img 
+              src={currentPreviewImage} 
+              alt="大图预览" 
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      )}
       
       <style>{`
         @keyframes fade-in { from { opacity: 0; transform: scale(1.05); filter: blur(10px); } to { opacity: 1; transform: scale(1); filter: blur(0); } }

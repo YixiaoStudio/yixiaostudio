@@ -324,6 +324,10 @@ const MyGallery: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [imageErrorCount, setImageErrorCount] = useState(0); // 限制图片错误日志输出
   
+  // ========== 新增：大图预览相关状态 ==========
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false); // 是否显示大图预览
+  const [currentPreviewImage, setCurrentPreviewImage] = useState(''); // 当前预览的图片URL
+  
   // 🔥 修复：使用ref保存状态，避免闭包捕获过期值导致的Hook异常
   const itemsRef = useRef<GalleryItem[]>([]);
   useEffect(() => {
@@ -465,9 +469,10 @@ const MyGallery: React.FC = () => {
       setItems(deduplicatedUpdated);
       localStorage.setItem('ai-photo-gallery', JSON.stringify(deduplicatedUpdated));
       
-      // 3. 关闭详情弹窗
+      // 3. 关闭详情弹窗和大图预览
       if (selectedItem && String(selectedItem.id) === idStr) {
         setSelectedItem(null);
+        setIsImageModalOpen(false); // 关闭大图预览
       }
       
       // 4. 重新加载后端最新数据（加锁避免重复）
@@ -634,7 +639,11 @@ const MyGallery: React.FC = () => {
         }
       });
       
-      // 5. 重新加载数据（确认清空，加锁避免重复）
+      // 5. 关闭所有弹窗
+      setSelectedItem(null);
+      setIsImageModalOpen(false);
+      
+      // 6. 重新加载数据（确认清空，加锁避免重复）
       if (!(loadGalleryData as any).currentExecuting) {
         await loadGalleryData();
       }
@@ -650,6 +659,37 @@ const MyGallery: React.FC = () => {
       }
     }
   }, [loadGalleryData]);
+
+  // ========== 新增：打开大图预览 ==========
+  const openImageModal = useCallback((imageUrl: string) => {
+    setCurrentPreviewImage(imageUrl);
+    setIsImageModalOpen(true);
+    // 禁止页面滚动
+    document.body.style.overflow = 'hidden';
+  }, []);
+
+  // ========== 新增：关闭大图预览 ==========
+  const closeImageModal = useCallback(() => {
+    setIsImageModalOpen(false);
+    setCurrentPreviewImage('');
+    // 恢复页面滚动
+    document.body.style.overflow = 'auto';
+  }, []);
+
+  // ========== 新增：监听ESC键关闭大图预览 ==========
+  useEffect(() => {
+    const handleEscKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isImageModalOpen) {
+        closeImageModal();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscKey);
+    return () => {
+      window.removeEventListener('keydown', handleEscKey);
+      document.body.style.overflow = 'auto'; // 组件卸载时恢复滚动
+    };
+  }, [isImageModalOpen, closeImageModal]);
 
   // 加载中状态
   if (loading) {
@@ -794,6 +834,7 @@ const MyGallery: React.FC = () => {
                         alt={`${selectedItem.templateTitle}-${idx+1}`} 
                       />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex flex-col items-center justify-center space-y-3 p-4 text-center">
+                         {/* 分享到社区按钮 */}
                          <button 
                            onClick={() => shareToCommunity(img)}
                            disabled={isSharing}
@@ -801,16 +842,64 @@ const MyGallery: React.FC = () => {
                          >
                            {isSharing ? '分享中...' : '分享到社区'}
                          </button>
+                         {/* 高清下载按钮 */}
                          <button 
                            onClick={() => handleSingleDownload(img, selectedItem.templateTitle, idx)}
                            className="w-full py-2 bg-white text-gray-900 rounded-xl font-black text-[10px] hover:bg-gray-100 transition-colors"
                          >
                            高清下载
                          </button>
+                         {/* ========== 新增：查看大图按钮 ========== */}
+                         <button 
+                           onClick={() => openImageModal(img)}
+                           className="w-full py-2 bg-amber-500 text-white rounded-xl font-black text-[10px] hover:bg-amber-600 transition-colors"
+                         >
+                           查看大图
+                         </button>
                       </div>
                     </div>
                   ))}
                </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== 新增：大图预览模态框 ========== */}
+      {isImageModalOpen && (
+        <div 
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 p-4 sm:p-8"
+          onClick={closeImageModal} // 点击空白处关闭
+        >
+          <div 
+            className="relative max-w-7xl max-h-[90vh] w-full"
+            onClick={(e) => e.stopPropagation()} // 阻止图片区域点击关闭
+          >
+            {/* 关闭按钮 */}
+            <button
+              onClick={closeImageModal}
+              className="absolute top-4 right-4 z-10 w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white/40 transition-all"
+              aria-label="关闭大图预览"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            
+            {/* 大图展示 */}
+            <img 
+              src={currentPreviewImage} 
+              alt="大图预览" 
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              loading="lazy"
+              onError={handleImageError}
+            />
+            
+            {/* 图片信息提示 */}
+            <div className="absolute bottom-4 left-0 right-0 text-center">
+              <p className="text-white/80 text-xs font-medium bg-black/40 backdrop-blur-md inline-block px-4 py-2 rounded-full">
+                可右键保存图片 | 按ESC键关闭预览
+              </p>
             </div>
           </div>
         </div>

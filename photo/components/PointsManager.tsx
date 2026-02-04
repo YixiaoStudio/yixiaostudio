@@ -123,7 +123,7 @@ const PointsManager: React.FC<PointsManagerProps> = ({
       
       // 保留原有提示语（样式/文案不动）
       const tipMsg = profile.crystalRoses === 0 
-        ? '领取成功！获得1个水晶玫瑰🌹' 
+        ? '获得1个水晶玫瑰🌹' 
         : `今日玫瑰已领取，当前玫瑰(${profile.crystalRoses})已达上限，无需补充🌹`;
       alert(tipMsg);
     } catch (error) {
@@ -137,32 +137,32 @@ const PointsManager: React.FC<PointsManagerProps> = ({
     // 防重复点击
     if (claimLoading.credits) return;
     
-    const today = getTodayDate();
-    // 二次校验（避免UI判断和实际状态不一致）
-    const claimedDate = profile.lastCreditsClaimDate || profile.lastPointsClaimDate
-      ? new Date(profile.lastCreditsClaimDate || profile.lastPointsClaimDate!).toISOString().split('T')[0]
-      : '';
-    if (claimedDate === today) {
-      alert('今日积分点已领取，明天再来吧！');
-      return;
-    }
-    
-    try {
-      // 调用后端领取积分接口
-      await claimCredits();
-      // 领取后立即强制同步最新状态（关键：解决加号不消失）
-      syncLatestProfile();
-      
-      // 保留原有提示语（样式/文案不动）
-      const tipMsg = profile.credits < 10 
-        ? `领取成功！积分点已补至10个✨` 
-        : `今日积分已领取，当前积分(${profile.credits})已达上限，无需补充✨`;
-      alert(tipMsg);
-    } catch (error) {
-      console.error('领取积分失败:', error);
-      alert('领取失败，请稍后重试！');
-    }
-  };
+   const today = getTodayDate();
+// 二次校验（避免UI判断和实际状态不一致）
+const claimedDate = profile.lastCreditsClaimDate || profile.lastPointsClaimDate
+  ? new Date(profile.lastCreditsClaimDate || profile.lastPointsClaimDate!).toISOString().split('T')[0]
+  : '';
+if (claimedDate === today) {
+  alert('今日积分点已领取，明天再来吧！');
+  return;
+}
+
+try {
+  // 调用后端领取积分接口
+  await claimCredits();
+  // 领取后立即强制同步最新状态（关键：解决加号不消失）
+  syncLatestProfile();
+  
+  // 保留原有提示语（样式/文案不动）
+  const tipMsg = profile.credits < 10 
+    ? `积分点已补至10个✨` 
+    : `今日积分已领取，当前积分(${profile.credits})已达上限，无需补充✨`;
+  alert(tipMsg); // 仅保留这一处成功提示
+} catch (error) {
+  console.error('领取积分失败:', error);
+  alert('领取失败，请稍后重试！');
+}
+};
 
   // 🔥 核心修改：扣减积分改为调用后端方法（样式/提示语/逻辑完全不动）
   const deductForGeneration = useCallback(async (type: 'single' | 'grid'): Promise<{ success: boolean; message: string }> => {

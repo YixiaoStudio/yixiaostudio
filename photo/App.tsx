@@ -41,101 +41,143 @@ const AuthModal = React.memo(({
   onRegister,
   onLogin,
   onSwitchMode,
-  onClose
-}) => (
-  <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-    <div className="bg-white rounded-2xl w-full max-w-md p-8 shadow-2xl">
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-bold">{isRegisterMode ? '用户注册' : '用户登录'}</h3>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-xl">×</button>
-      </div>
+  onClose,
+  onForgotPassword // 新增：忘记密码回调
+}) => {
+  // ========== 新增：密码显示/隐藏状态 ==========
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
-      {isRegisterMode ? (
-        <div className="space-y-4 mb-4">
-          <input
-            type="text"
-            name="username"
-            value={authForm.username}
-            onChange={onInputChange}
-            placeholder="用户名"
-            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            autoComplete="off"
-          />
-          <div className="relative">
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md p-8 shadow-2xl">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-bold">{isRegisterMode ? '用户注册' : '用户登录'}</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-xl">×</button>
+        </div>
+
+        {isRegisterMode ? (
+          <div className="space-y-4 mb-4">
             <input
-              type="email"
-              name="email"
-              value={authForm.email}
+              type="text"
+              name="username"
+              value={authForm.username}
               onChange={onInputChange}
-              placeholder="邮箱"
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${authForm.email && !isValidEmail(authForm.email)
+              placeholder="用户名"
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoComplete="off"
+            />
+            <div className="relative">
+              <input
+                type="email"
+                name="email"
+                value={authForm.email}
+                onChange={onInputChange}
+                placeholder="邮箱"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${authForm.email && !isValidEmail(authForm.email)
                   ? 'border-red-500 focus:ring-red-500'
                   : 'focus:ring-blue-500'
                 }`}
+                autoComplete="off"
+              />
+              {/* 新增：邮箱格式错误提示 */}
+              {authForm.email && !isValidEmail(authForm.email) && (
+                <p className="absolute -bottom-5 left-0 text-xs text-red-500">请输入有效的邮箱地址</p>
+              )}
+            </div>
+            {/* ========== 修改：注册密码输入框 - 统一使用同一个眼睛图标 ========== */}
+            <div className="relative">
+              <input
+                type={showRegisterPassword ? 'text' : 'password'}
+                name="password"
+                value={authForm.password}
+                onChange={onInputChange}
+                placeholder="密码"
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                aria-label={showRegisterPassword ? '隐藏密码' : '显示密码'}
+              >
+                {/* 统一使用睁眼图标 */}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 mb-4">
+            <input
+              type="text"
+              name="account"
+              value={authForm.account}
+              onChange={onInputChange}
+              placeholder="用户名/邮箱"
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               autoComplete="off"
             />
-            {/* 新增：邮箱格式错误提示 */}
-            {authForm.email && !isValidEmail(authForm.email) && (
-              <p className="absolute -bottom-5 left-0 text-xs text-red-500">请输入有效的邮箱地址</p>
-            )}
+            {/* ========== 修改：登录密码输入框 - 统一使用同一个眼睛图标 ========== */}
+            <div className="relative">
+              <input
+                type={showLoginPassword ? 'text' : 'password'}
+                name="loginPassword"
+                value={authForm.loginPassword}
+                onChange={onInputChange}
+                placeholder="密码"
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowLoginPassword(!showLoginPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                aria-label={showLoginPassword ? '隐藏密码' : '显示密码'}
+              >
+                {/* 统一使用睁眼图标 */}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              </button>
+            </div>
           </div>
-          <input
-            type="password"
-            name="password"
-            value={authForm.password}
-            onChange={onInputChange}
-            placeholder="密码"
-            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            autoComplete="new-password"
-          />
-        </div>
-      ) : (
-        <div className="space-y-4 mb-4">
-          <input
-            type="text"
-            name="account"
-            value={authForm.account}
-            onChange={onInputChange}
-            placeholder="用户名/邮箱"
-            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            autoComplete="off"
-          />
-          <input
-            type="password"
-            name="loginPassword"
-            value={authForm.loginPassword}
-            onChange={onInputChange}
-            placeholder="密码"
-            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            autoComplete="current-password"
-          />
-        </div>
-      )}
-
-      {authMessage && (
-        <div className={`text-sm text-center mb-4 ${authMessageType === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-          {authMessage}
-        </div>
-      )}
-
-      <button
-        onClick={isRegisterMode ? onRegister : onLogin}
-        disabled={authLoading}
-        className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-70"
-      >
-        {authLoading ? '处理中...' : (isRegisterMode ? '注册' : '登录')}
-      </button>
-
-      <div className="text-center mt-4 text-sm">
-        {isRegisterMode ? (
-          <>已有账号？<button onClick={onSwitchMode} className="text-blue-600 ml-1">登录</button></>
-        ) : (
-          <>没有账号？<button onClick={onSwitchMode} className="text-blue-600 ml-1">注册</button></>
         )}
+
+        {authMessage && (
+          <div className={`text-sm text-center mb-4 ${authMessageType === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+            {authMessage}
+          </div>
+        )}
+
+        <button
+          onClick={isRegisterMode ? onRegister : onLogin}
+          disabled={authLoading}
+          className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-70"
+        >
+          {authLoading ? '处理中...' : (isRegisterMode ? '注册' : '登录')}
+        </button>
+
+        <div className="text-center mt-4 text-sm">
+          {isRegisterMode ? (
+            <>已有账号？<button onClick={onSwitchMode} className="text-blue-600 ml-1">登录</button></>
+          ) : (
+            <>
+              没有账号？<button onClick={onSwitchMode} className="text-blue-600 ml-1">注册</button>
+              <br />
+              {/* 核心修改：添加 text-xs 类缩小字号，可根据需要调整 mt-1 减小间距 */}
+              <button onClick={onForgotPassword} className="text-blue-600 mt-2 text-xs">忘记密码？</button>
+            </>
+          )}
+        </div>
       </div>
     </div>
-  </div>
-));
+  );
+});
 
 // ========== 提取独立的邮箱验证模态框组件 ==========
 const VerifyModal = React.memo(({
@@ -182,6 +224,189 @@ const VerifyModal = React.memo(({
     </div>
   </div>
 ));
+
+// ========== 新增：密码找回模态框组件 ==========
+const ForgotPasswordModal = React.memo(({
+  forgotForm,
+  forgotStep,
+  forgotMessage,
+  forgotMessageType,
+  forgotLoading,
+  onInputChange,
+  onSendCode,
+  onVerifyCode,
+  onResetPassword,
+  onClose,
+  onBackToLogin
+}) => {
+  // ========== 新增：密码显示/隐藏状态 ==========
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md p-8 shadow-2xl">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-bold">
+            {forgotStep === 1 ? '找回密码' : forgotStep === 2 ? '验证验证码' : '重置密码'}
+          </h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-xl">×</button>
+        </div>
+
+        {forgotStep === 1 && (
+          <div className="space-y-4 mb-4">
+            <div className="relative">
+              <input
+                type="email"
+                name="email"
+                value={forgotForm.email}
+                onChange={onInputChange}
+                placeholder="请输入注册时的邮箱"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${forgotForm.email && !isValidEmail(forgotForm.email)
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'focus:ring-blue-500'
+                }`}
+                autoComplete="off"
+              />
+              {forgotForm.email && !isValidEmail(forgotForm.email) && (
+                <p className="absolute -bottom-5 left-0 text-xs text-red-500">请输入有效的邮箱地址</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {forgotStep === 2 && (
+          <div className="space-y-4 mb-4">
+            <div className="text-center text-sm mb-2">
+              请输入发送到 <span className="text-blue-600 font-bold">{forgotForm.email}</span> 的6位重置验证码
+            </div>
+            <input
+              type="text"
+              name="resetCode"
+              value={forgotForm.resetCode}
+              onChange={onInputChange}
+              placeholder="6位数字验证码"
+              maxLength={6}
+              inputMode="numeric"
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoComplete="off"
+            />
+          </div>
+        )}
+
+        {forgotStep === 3 && (
+          <div className="space-y-4 mb-4">
+            {/* ========== 修改：新密码输入框 - 统一使用同一个眼睛图标 ========== */}
+            <div className="relative">
+              <input
+                type={showNewPassword ? 'text' : 'password'}
+                name="newPassword"
+                value={forgotForm.newPassword}
+                onChange={onInputChange}
+                placeholder="请输入新密码（至少6位）"
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                aria-label={showNewPassword ? '隐藏密码' : '显示密码'}
+              >
+                {/* 统一使用睁眼图标 */}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              </button>
+            </div>
+
+            {/* ========== 修改：确认密码输入框 - 统一使用同一个眼睛图标 ========== */}
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                name="confirmPassword"
+                value={forgotForm.confirmPassword}
+                onChange={onInputChange}
+                placeholder="请确认新密码"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 pr-10 ${forgotForm.confirmPassword && forgotForm.newPassword !== forgotForm.confirmPassword
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'focus:ring-blue-500'
+                }`}
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                aria-label={showConfirmPassword ? '隐藏密码' : '显示密码'}
+              >
+                {/* 统一使用睁眼图标，移除所有状态判断 */}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              </button>
+              {forgotForm.confirmPassword && forgotForm.newPassword !== forgotForm.confirmPassword && (
+                <p className="absolute -bottom-5 left-0 text-xs text-red-500">两次输入的密码不一致</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {forgotMessage && (
+          <div className={`text-sm text-center mb-4 ${forgotMessageType === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+            {forgotMessage}
+          </div>
+        )}
+
+        <div className="flex flex-col space-y-2">
+          {forgotStep === 1 && (
+            <button
+              onClick={onSendCode}
+              disabled={forgotLoading || !forgotForm.email || !isValidEmail(forgotForm.email)}
+              className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-70"
+            >
+              {forgotLoading ? '发送中...' : '发送重置验证码'}
+            </button>
+          )}
+
+          {forgotStep === 2 && (
+            <button
+              onClick={onVerifyCode}
+              disabled={forgotLoading || !forgotForm.resetCode || forgotForm.resetCode.length !== 6}
+              className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-70"
+            >
+              {forgotLoading ? '验证中...' : '验证验证码'}
+            </button>
+          )}
+
+          {forgotStep === 3 && (
+            <button
+              onClick={onResetPassword}
+              disabled={
+                forgotLoading ||
+                !forgotForm.newPassword ||
+                forgotForm.newPassword.length < 6 ||
+                forgotForm.newPassword !== forgotForm.confirmPassword
+              }
+              className="w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-70"
+            >
+              {forgotLoading ? '重置中...' : '重置密码'}
+            </button>
+          )}
+
+          <button
+            onClick={onBackToLogin}
+            className="w-full py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+          >
+            返回登录
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 // ========== 工具函数：调用积分接口（修复CORS + 避免缓存） ==========
 const requestPointsApi = async (userId: number, url: string, options: RequestInit = {}) => {
@@ -238,6 +463,25 @@ const App: React.FC = () => {
   const [verifyMessageType, setVerifyMessageType] = useState<'success' | 'error'>('error');
   const [currentVerifyEmail, setCurrentVerifyEmail] = useState('');
   const [verifyLoading, setVerifyLoading] = useState(false);
+
+  // ========== 新增状态：保存待自动登录的用户信息 ==========
+  const [autoLoginData, setAutoLoginData] = useState<{
+    account: string;
+    password: string;
+  } | null>(null);
+
+  // ========== 新增：密码找回相关状态 ==========
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotStep, setForgotStep] = useState(1); // 1:输入邮箱 2:验证验证码 3:重置密码
+  const [forgotForm, setForgotForm] = useState({
+    email: '',
+    resetCode: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [forgotMessage, setForgotMessage] = useState('');
+  const [forgotMessageType, setForgotMessageType] = useState<'success' | 'error'>('error');
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   // ========== 积分状态管理（对接后端） ==========
   const [profile, setProfile] = useState<PointsProfile>({
@@ -509,11 +753,59 @@ const App: React.FC = () => {
     }));
   }, []);
 
-  // ===== 注册接口（核心修复：增加前端邮箱验证 + 详细日志） =====
+  // ========== 新增：忘记密码表单输入处理 ==========
+  const handleForgotInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setForgotForm(prev => ({ ...prev, [name]: name === 'resetCode' ? value.replace(/[^0-9]/g, '').slice(0, 6) : value }));
+    setForgotMessage('');
+  }, []);
+
+  // ========== 新增：独立的自动登录函数 ==========
+  const autoLogin = useCallback(async () => {
+    if (!autoLoginData) return;
+
+    const { account, password } = autoLoginData;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ account, password })
+      });
+      const data = await response.json();
+
+      if (data.code === 200) {
+        // 统一用户ID字段名
+        const userData = {
+          ...data.data,
+          id: data.data.id || data.data.user_id
+        };
+        setCurrentUser(userData);
+        localStorage.setItem('ai_photo_generator_user', JSON.stringify(userData));
+        await fetchProfile(); // 加载积分
+        setShowAuthModal(false);
+        setShowVerifyModal(false);
+        // 移除成功提示的弹窗
+      } else {
+        alert(`自动登录失败：${data.msg || '请手动登录'}`);
+        setShowVerifyModal(false);
+        setShowAuthModal(true);
+        setIsRegisterMode(false);
+      }
+    } catch (error) {
+      console.error('自动登录失败：', error);
+      alert('自动登录失败，请手动登录');
+      setShowVerifyModal(false);
+      setShowAuthModal(true);
+      setIsRegisterMode(false);
+    }
+  }, [autoLoginData, fetchProfile]);
+
+  // ===== 注册接口（核心修改：保存用户信息用于自动登录） =====
   const handleRegister = useCallback(async () => {
     const { username, email, password } = authForm;
 
-    // 新增1：前端邮箱格式验证
+    // 前端验证
     if (!username) {
       setAuthMessage('请输入用户名！');
       setAuthMessageType('error');
@@ -535,7 +827,6 @@ const App: React.FC = () => {
       return;
     }
 
-    // 新增2：注册参数日志，排查传参问题
     console.log('注册请求参数：', { username, email, password_length: password.length });
 
     setAuthLoading(true);
@@ -554,12 +845,12 @@ const App: React.FC = () => {
         setAuthForm(prev => ({ ...prev, username: '', email: '', password: '' }));
         if (data.msg.includes('请查收邮箱')) {
           setCurrentVerifyEmail(email);
-          setTimeout(() => {
-            setShowAuthModal(false);
-            setShowVerifyModal(true);
-          }, 3000);
+          // 核心修改：保存注册信息用于自动登录（邮箱作为账号）
+          setAutoLoginData({ account: email, password });
+          setShowAuthModal(false);
+          setShowVerifyModal(true);
         } else {
-          setTimeout(() => setIsRegisterMode(false), 2000);
+          setIsRegisterMode(false);
         }
       } else {
         setAuthMessage(data.msg || '注册失败');
@@ -573,7 +864,7 @@ const App: React.FC = () => {
     }
   }, [authForm]);
 
-  // ===== 登录接口（核心修复：统一用户ID字段名 + 登录后立即拉取积分） =====
+  // ===== 登录接口（核心修改：保存用户信息用于自动登录） =====
   const handleLogin = useCallback(async () => {
     const { account, loginPassword } = authForm;
     if (!account || !loginPassword) {
@@ -593,26 +884,25 @@ const App: React.FC = () => {
       const data = await response.json();
 
       if (data.code === 200) {
-        // 核心修复：统一用户ID字段名（兼容user_id和id）
+        // 正常登录逻辑
         const userData = {
           ...data.data,
-          id: data.data.id || data.data.user_id // 优先用id，没有则用user_id
+          id: data.data.id || data.data.user_id
         };
-        // 存储修复后的用户信息
         setCurrentUser(userData);
         localStorage.setItem('ai_photo_generator_user', JSON.stringify(userData));
-
-        // 登录成功后立即拉取最新积分
         await fetchProfile();
-
         setAuthMessage('登录成功！');
         setAuthMessageType('success');
-        setTimeout(() => setShowAuthModal(false), 1000);
+        setShowAuthModal(false);
       } else if (data.code === 403 && data.msg.includes('邮箱尚未验证')) {
         setAuthMessage(data.msg);
         setAuthMessageType('error');
         setCurrentVerifyEmail(data.data?.email || account);
-        setTimeout(() => setShowVerifyModal(true), 3000);
+        // 核心修改：保存登录信息用于自动登录
+        setAutoLoginData({ account, password: loginPassword });
+        setShowVerifyModal(true);
+        setShowAuthModal(false);
       } else {
         setAuthMessage(data.msg || '登录失败');
         setAuthMessageType('error');
@@ -623,9 +913,9 @@ const App: React.FC = () => {
     } finally {
       setAuthLoading(false);
     }
-  }, [authForm, fetchProfile]); // 新增fetchProfile依赖
+  }, [authForm, fetchProfile]);
 
-  // ===== 邮箱验证接口（保留原有逻辑） =====
+  // ===== 邮箱验证接口（核心修改：验证成功后自动登录） =====
   const handleVerifyEmail = useCallback(async () => {
     if (!verifyCode || verifyCode.length !== 6 || !/^\d{6}$/.test(verifyCode)) {
       setVerifyMessage('请输入6位数字验证码！');
@@ -647,13 +937,8 @@ const App: React.FC = () => {
         setVerifyMessage(data.msg);
         setVerifyMessageType('success');
         setVerifyCode('');
-        setTimeout(() => {
-          setShowVerifyModal(false);
-          setShowAuthModal(true);
-          setIsRegisterMode(false);
-          setAuthMessage('验证成功，请登录！');
-          setAuthMessageType('success');
-        }, 2000);
+        // 核心修改：验证成功后调用自动登录函数
+        await autoLogin();
       } else {
         setVerifyMessage(data.msg || '验证失败');
         setVerifyMessageType('error');
@@ -664,12 +949,13 @@ const App: React.FC = () => {
     } finally {
       setVerifyLoading(false);
     }
-  }, [verifyCode]);
+  }, [verifyCode, autoLogin]);
 
   // ===== 退出登录（移除Token清除） =====
   const handleLogout = useCallback(() => {
     setCurrentUser(null);
     localStorage.removeItem('ai_photo_generator_user');
+    setAutoLoginData(null); // 清空自动登录数据
 
     // 退出登录后重置积分状态为游客模式
     setProfile({
@@ -680,6 +966,157 @@ const App: React.FC = () => {
       lastCreditsClaimDate: '',
       isPlusMember: false
     });
+  }, []);
+
+  // ========== 新增：发送密码重置验证码 ==========
+  const handleSendResetCode = useCallback(async () => {
+    const { email } = forgotForm;
+    if (!email || !isValidEmail(email)) {
+      setForgotMessage('请输入有效的邮箱地址！');
+      setForgotMessageType('error');
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/forgot-password/send-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email })
+      });
+      const data = await response.json();
+
+      if (data.code === 200) {
+        setForgotMessage(data.msg);
+        setForgotMessageType('success');
+        setForgotStep(2); // 进入验证码验证步骤
+      } else {
+        setForgotMessage(data.msg || '发送验证码失败');
+        setForgotMessageType('error');
+      }
+    } catch (error) {
+      setForgotMessage('网络错误，请检查后端服务');
+      setForgotMessageType('error');
+    } finally {
+      setForgotLoading(false);
+    }
+  }, [forgotForm]);
+
+  // ========== 新增：验证密码重置验证码 ==========
+  const handleVerifyResetCode = useCallback(async () => {
+    const { email, resetCode } = forgotForm;
+    if (!resetCode || resetCode.length !== 6 || !/^\d{6}$/.test(resetCode)) {
+      setForgotMessage('请输入6位数字验证码！');
+      setForgotMessageType('error');
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/forgot-password/verify-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, code: resetCode })
+      });
+      const data = await response.json();
+
+      if (data.code === 200) {
+        setForgotMessage('验证码验证成功，请设置新密码');
+        setForgotMessageType('success');
+        setForgotStep(3); // 进入重置密码步骤
+      } else {
+        setForgotMessage(data.msg || '验证码验证失败');
+        setForgotMessageType('error');
+      }
+    } catch (error) {
+      setForgotMessage('网络错误，请检查后端服务');
+      setForgotMessageType('error');
+    } finally {
+      setForgotLoading(false);
+    }
+  }, [forgotForm]);
+
+  // ========== 新增：重置密码 ==========
+  const handleResetPassword = useCallback(async () => {
+    const { email, resetCode, newPassword, confirmPassword } = forgotForm;
+
+    // 前端验证
+    if (!newPassword || newPassword.length < 6) {
+      setForgotMessage('新密码长度不能少于6位！');
+      setForgotMessageType('error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setForgotMessage('两次输入的密码不一致！');
+      setForgotMessageType('error');
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/forgot-password/reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email,
+          code: resetCode,
+          new_password: newPassword
+        })
+      });
+      const data = await response.json();
+
+      if (data.code === 200) {
+        setForgotMessage(data.msg);
+        setForgotMessageType('success');
+        // 重置成功后返回登录页面
+        setTimeout(() => {
+          setShowForgotModal(false);
+          setShowAuthModal(true);
+          setIsRegisterMode(false);
+          // 清空找回密码表单
+          setForgotForm({
+            email: '',
+            resetCode: '',
+            newPassword: '',
+            confirmPassword: ''
+          });
+          setForgotStep(1);
+        }, 2000);
+      } else {
+        setForgotMessage(data.msg || '重置密码失败');
+        setForgotMessageType('error');
+      }
+    } catch (error) {
+      setForgotMessage('网络错误，请检查后端服务');
+      setForgotMessageType('error');
+    } finally {
+      setForgotLoading(false);
+    }
+  }, [forgotForm]);
+
+  // ========== 新增：打开忘记密码模态框 ==========
+  const handleOpenForgotPassword = useCallback(() => {
+    setShowAuthModal(false);
+    setShowForgotModal(true);
+    // 重置忘记密码状态
+    setForgotStep(1);
+    setForgotForm({
+      email: '',
+      resetCode: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+    setForgotMessage('');
+  }, []);
+
+  // ========== 新增：返回登录页面 ==========
+  const handleBackToLogin = useCallback(() => {
+    setShowForgotModal(false);
+    setShowAuthModal(true);
+    setIsRegisterMode(false);
   }, []);
 
   // ===== 渲染 =====
@@ -729,6 +1166,7 @@ const App: React.FC = () => {
               onLogin={handleLogin}
               onSwitchMode={handleSwitchAuthMode}
               onClose={() => setShowAuthModal(false)}
+              onForgotPassword={handleOpenForgotPassword} // 新增：忘记密码回调
             />
           )}
           {showVerifyModal && (
@@ -741,6 +1179,22 @@ const App: React.FC = () => {
               onCodeChange={handleVerifyCodeChange}
               onVerify={handleVerifyEmail}
               onClose={() => setShowVerifyModal(false)}
+            />
+          )}
+          {/* 新增：忘记密码模态框 */}
+          {showForgotModal && (
+            <ForgotPasswordModal
+              forgotForm={forgotForm}
+              forgotStep={forgotStep}
+              forgotMessage={forgotMessage}
+              forgotMessageType={forgotMessageType}
+              forgotLoading={forgotLoading}
+              onInputChange={handleForgotInputChange}
+              onSendCode={handleSendResetCode}
+              onVerifyCode={handleVerifyResetCode}
+              onResetPassword={handleResetPassword}
+              onClose={() => setShowForgotModal(false)}
+              onBackToLogin={handleBackToLogin}
             />
           )}
         </div>
