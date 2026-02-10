@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import PointsManager from './PointsManager'; 
 import { PointsProfile } from './PointsManager';
+// 🔥 新增：导入积分刷新Context
+import { PointsRefreshContext } from '../App';
 
 // 定义完整的用户类型接口
 interface UserProfile {
@@ -9,13 +11,13 @@ interface UserProfile {
   points: number;
   credits: number;
   isPlus: boolean;
-  crystalRoses?: number;
+  crystalRoses?: number; // 明确为数字类型（支持小数）
   lastRoseClaimDate?: string;
   lastPointsClaimDate?: string;
   avatar?: string;
 }
 
-// 保留Props接口
+// 保留Props接口（新增onPlusButtonClick，可选，补充deductRose）
 interface HeaderProps {
   currentUser: any; 
   onLoginClick: () => void; 
@@ -25,6 +27,9 @@ interface HeaderProps {
   claimCredits: () => Promise<void>; 
   claimRose: () => Promise<void>; 
   deductCredits: (num?: number) => Promise<boolean>; 
+  // 🔥 新增：补充deductRose Props定义（关键修复）
+  deductRose: (num?: number) => Promise<boolean>;
+  onPlusButtonClick?: () => void; // 新增：接收跳转函数（可选）
 }
 
 // 组件接收Props
@@ -36,29 +41,35 @@ const Header: React.FC<HeaderProps> = ({
   profileLoading, 
   claimCredits, 
   claimRose, 
-  deductCredits 
+  deductCredits,
+  deductRose, // 🔥 新增：接收扣减玫瑰方法
+  onPlusButtonClick // 接收跳转函数
 }) => {
   const location = useLocation();
-  const navigate = useNavigate();
-  // 🔥 核心修改：将原galleryCount改为【未读数量】unreadGalleryCount
+  const navigate = useNavigate(); // 路由跳转钩子
+  // 🔥 核心修改：移除PLUS模态框相关状态
   const [unreadGalleryCount, setUnreadGalleryCount] = useState(0);
   const [localProfile, setLocalProfile] = useState<UserProfile | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isPlusModalOpen, setIsPlusModalOpen] = useState(false);
   const [claimLoading, setClaimLoading] = useState({ credits: false, rose: false });
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // 邀请码/令牌相关状态（下拉框内使用）
+  // 🔥 新增：获取刷新积分的函数（添加类型判断，避免undefined）
+  const pointsRefreshContext = useContext(PointsRefreshContext);
+  const refreshPoints = pointsRefreshContext?.refreshPoints;
+
+  // 邀请码/令牌相关状态（新增兑换类型选择）
   const [inviteCodeInput, setInviteCodeInput] = useState('');
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteMessage, setInviteMessage] = useState('');
   const [inviteMessageType, setInviteMessageType] = useState<'success' | 'error'>('error');
+  // 新增：兑换类型选择（默认积分）
+  const [exchangeType, setExchangeType] = useState<'credits' | 'rose'>('credits');
 
-  // 监听 Esc 键关闭弹窗（原有逻辑不变）
+  // 监听 Esc 键关闭菜单（移除模态框相关）
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setIsPlusModalOpen(false);
         setIsMenuOpen(false);
       }
     };
@@ -87,19 +98,24 @@ const Header: React.FC<HeaderProps> = ({
     setUnreadGalleryCount(0);
   };
 
-  // 封装更新用户数据的函数（原有逻辑修改：替换为未读数量计算）
+  // 封装更新用户数据的函数（核心修改：玫瑰数量保留1位小数，避免取整）
   const updateHeaderData = () => {
     // 🔥 替换：获取未读数量而非总数量
     const unread = getUnreadGalleryCount();
     setUnreadGalleryCount(unread);
     
     if (currentUser) {
+      // 🔥 核心修改1：玫瑰数量保留1位小数，确保0.5正确显示
+      const crystalRoses = typeof profile.crystalRoses === 'number' 
+        ? parseFloat(profile.crystalRoses.toFixed(1)) // 保留1位小数
+        : 0;
+      
       setLocalProfile({
         userName: currentUser.username || "次元造像师",
         points: profile.points, 
-        credits: profile.credits, 
+        credits: profile.credits, // credits保持整数显示
         isPlus: profile.isPlusMember || false, 
-        crystalRoses: profile.crystalRoses, 
+        crystalRoses: crystalRoses, // 使用处理后的小数玫瑰数
         lastRoseClaimDate: profile.lastRoseClaimDate, 
         lastPointsClaimDate: profile.lastCreditsClaimDate, 
         avatar: currentUser.avatar || 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/female-avatar.png'
@@ -110,7 +126,7 @@ const Header: React.FC<HeaderProps> = ({
         points: 0,
         credits: 0,
         isPlus: false,
-        crystalRoses: 0,
+        crystalRoses: 0, // 默认0朵
         lastRoseClaimDate: '',
         lastPointsClaimDate: '',
         avatar: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/female-avatar.png'
@@ -118,12 +134,13 @@ const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  // 初始化用户数据 + 监听profile变化（原有逻辑不变）
+  // 🔥 核心修复1：删掉1秒定时器，只在currentUser/profile变化时更新
   useEffect(() => {
     updateHeaderData();
-    const interval = setInterval(updateHeaderData, 1000);
-    return () => clearInterval(interval);
-  }, [currentUser, profile]); 
+    // ❌ 删掉这行定时轮询：导致数据覆盖的元凶
+    // const interval = setInterval(updateHeaderData, 1000);
+    // return () => clearInterval(interval);
+  }, [currentUser, profile]); // 只有依赖变化时才更新
 
   // 🔥 新增：监听路由变化，进入/gallery页面时自动标记为已读
   useEffect(() => {
@@ -154,55 +171,50 @@ const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  // 订阅PLUS会员（原有样式/逻辑完全不变）
-  const handleSubscribe = (planName: string) => {
-    if (window.confirm(`确认订阅 ${planName}？（演示环境，点击确认模拟成功）`)) {
-      setLocalProfile(prev => prev ? { ...prev, isPlus: true } : null);
-      setIsPlusModalOpen(false);
-      alert('尊贵的 PLUS 会员，欢迎加入！您的专属特权已即刻生效。');
+  // 🔥 核心修改：移除PLUS订阅弹窗函数，改为跳转逻辑
+  const handlePlusButtonClick = () => {
+    // 优先使用父组件传递的跳转函数，没有则直接使用navigate
+    if (onPlusButtonClick) {
+      onPlusButtonClick();
+    } else {
+      navigate('/subscribe'); // 直接跳转到订阅页面
     }
   };
 
   // 封装领取Credits的函数（精简弹窗：移除重复的alert提示）
-const handleClaimCredits = async () => {
-  if (claimLoading.credits) return;
-  setClaimLoading(prev => ({ ...prev, credits: true }));
-  try {
-    await claimCredits(); // 核心领取逻辑（提示语移到PointsManager中）
-    updateHeaderData();
-    // 移除这里的alert提示，避免重复弹窗
-  } catch (error) {
-    console.error('领取Credits失败:', error);
-    // 保留失败提示（如果PointsManager中未处理失败场景）
-    alert('领取失败，请稍后重试');
-  } finally {
-    setClaimLoading(prev => ({ ...prev, credits: false }));
-  }
-};
-// 封装领取玫瑰的函数（精简弹窗：移除所有alert，由PointsManager统一处理）
-const handleClaimRose = async () => {
-  if (claimLoading.rose) return;
-  setClaimLoading(prev => ({ ...prev, rose: true }));
-  try {
-    await claimRose(); // 核心领取逻辑（所有提示移到PointsManager中）
-    updateHeaderData();
-    // 完全移除成功alert，由PointsManager显示唯一提示
-  } catch (error) {
-    console.error('领取玫瑰失败:', error);
-    // 完全移除失败alert，由PointsManager显示唯一提示
-  } finally {
-    setClaimLoading(prev => ({ ...prev, rose: false }));
-  }
-};
-
-  const closeModal = () => {
-    setIsPlusModalOpen(false);
+  const handleClaimCredits = async () => {
+    if (claimLoading.credits) return;
+    setClaimLoading(prev => ({ ...prev, credits: true }));
+    try {
+      await claimCredits(); // 核心领取逻辑（提示语移到PointsManager中）
+      updateHeaderData(); // 领取后更新
+    } catch (error) {
+      console.error('领取Credits失败:', error);
+      alert('领取失败，请稍后重试');
+    } finally {
+      setClaimLoading(prev => ({ ...prev, credits: false }));
+    }
   };
 
-  // 重置邀请码/令牌状态
+  // 封装领取玫瑰的函数（核心修改2：领取0.5朵玫瑰后正确更新数值）
+  const handleClaimRose = async () => {
+    if (claimLoading.rose) return;
+    setClaimLoading(prev => ({ ...prev, rose: true }));
+    try {
+      await claimRose(); // 核心领取逻辑（所有提示移到PointsManager中）
+      updateHeaderData(); // 领取后强制更新
+    } catch (error) {
+      console.error('领取玫瑰失败:', error);
+    } finally {
+      setClaimLoading(prev => ({ ...prev, rose: false }));
+    }
+  };
+
+  // 重置邀请码/令牌状态（新增重置兑换类型）
   const resetInviteState = () => {
     setInviteCodeInput('');
     setInviteMessage('');
+    setExchangeType('credits'); // 重置为默认的积分兑换
   };
 
   // 处理令牌输入
@@ -211,7 +223,13 @@ const handleClaimRose = async () => {
     setInviteMessage('');
   };
 
-  // 令牌兑换接口（原有逻辑不变）
+  // 处理兑换类型变更
+  const handleExchangeTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setExchangeType(e.target.value as 'credits' | 'rose');
+    setInviteMessage(''); // 切换类型时清空提示
+  };
+
+  // 🔥 核心修复2：兑换令牌成功后，不仅更新本地，还要从后端拉取最新玫瑰数
   const handleExchangeInviteCode = async () => {
     if (!inviteCodeInput) {
       setInviteMessage('请输入兑换令牌！');
@@ -226,14 +244,15 @@ const handleClaimRose = async () => {
 
     setInviteLoading(true);
     try {
-      const API_BASE_URL = 'https://sd5r3ie17n7a7iuta91j0.apigateway-cn-beijing.volceapi.com';
+      const API_BASE_URL = 'https://sd5j17d5mg7k3v1e7vu60.apigateway-cn-beijing.volceapi.com';
       const response = await fetch(`${API_BASE_URL}/api/token/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           token: inviteCodeInput.toUpperCase(),
-          userId: currentUser.id.toString()
+          userId: currentUser.id.toString(),
+          type: exchangeType // 新增：传递兑换类型
         })
       });
       
@@ -241,10 +260,18 @@ const handleClaimRose = async () => {
       
       if (response.ok) {
         if (data.success) {
-          setInviteMessage(data.message || '令牌验证成功！已发放credits');
+          // 根据兑换类型显示不同的成功提示
+          const typeText = exchangeType === 'credits' ? '积分' : '玫瑰';
+          setInviteMessage(data.message || `令牌验证成功！已发放${typeText}`);
           setInviteMessageType('success');
           setInviteCodeInput('');
-          await handleClaimCredits();
+          
+          // 🔥 关键修复：兑换成功后，主动从后端拉取最新数据
+          if (refreshPoints) {
+            await refreshPoints(); // 从后端重新获取玫瑰/积分
+          }
+          updateHeaderData(); // 再更新本地显示
+          
           setTimeout(() => setInviteMessage(''), 3000);
         } else {
           setInviteMessage(data.message || '令牌无效或已过期');
@@ -263,7 +290,7 @@ const handleClaimRose = async () => {
     }
   };
 
-  // 渲染部分（🔥 仅修改角标显示条件：unreadGalleryCount > 0）
+  // 渲染部分（🔥 补全所有截断代码，修复PointsManager调用）
   return (
     <header className="sticky top-0 z-50 glass-effect border-b">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -276,7 +303,7 @@ const handleClaimRose = async () => {
             />
           </div>
           <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
-            逸潇次元拍
+            逸潇次元拍・体验版
           </span>
         </Link>
 
@@ -303,7 +330,7 @@ const handleClaimRose = async () => {
           </Link>
         </nav>
 
-        {/* User Area（原有逻辑完全不变） */}
+        {/* User Area（🔥 修改PLUS按钮点击事件，补全截断代码） */}
         <div className="flex items-center space-x-2 md:space-x-3 flex-shrink-0">
           {!currentUser ? (
             <button
@@ -314,17 +341,24 @@ const handleClaimRose = async () => {
             </button>
           ) : (
             <>
+              {/* 🔥 核心修复：完整传递PointsManager所需的所有Props */}
               <PointsManager 
-                profile={profile}
+                profile={{
+                  ...profile,
+                  crystalRoses: localProfile?.crystalRoses || 0
+                }}
                 profileLoading={profileLoading}
                 claimCredits={handleClaimCredits}
                 claimRose={handleClaimRose}
                 deductCredits={deductCredits}
+                deductRose={deductRose} // 传递扣减玫瑰方法
                 claimLoading={claimLoading}
+                refreshPoints={refreshPoints || (() => Promise.resolve())} // 兜底处理，避免undefined
               />
 
+              {/* 🔥 核心修改：PLUS按钮点击跳转到订阅页面 */}
               <button
-                onClick={() => setIsPlusModalOpen(true)}
+                onClick={handlePlusButtonClick}
                 className="relative group overflow-hidden px-4 py-1.5 bg-gray-900 text-white rounded-full transition-all hover:ring-2 hover:ring-amber-400">
                 <div className="flex items-center space-x-1">
                   <span className="text-[10px] font-black tracking-tighter italic bg-clip-text text-transparent bg-gradient-to-r from-amber-200 to-yellow-500">
@@ -342,7 +376,11 @@ const handleClaimRose = async () => {
                   onClick={() => setIsMenuOpen(!isMenuOpen)}
                   className="w-9 h-9 rounded-full overflow-hidden border-2 border-white shadow-sm ring-1 ring-gray-100 transition-transform active:scale-90"
                 >
-                  <img src={localProfile?.avatar || 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/female-avatar.png'} className="w-full h-full object-cover" alt="avatar" />
+                  <img 
+                    src={localProfile?.avatar || 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/female-avatar.png'} 
+                    className="w-full h-full object-cover" 
+                    alt="avatar" 
+                  />
                 </button>
 
                 {isMenuOpen && (
@@ -367,11 +405,24 @@ const handleClaimRose = async () => {
                     <div className="px-5 py-3 border-t border-gray-50">
                       <p className="text-sm font-black text-gray-700 mb-3">令牌兑换</p>
                       
+                      {/* 新增：兑换类型选择下拉框 */}
+                      <div className="mb-3">
+                        <select
+                          value={exchangeType}
+                          onChange={handleExchangeTypeChange}
+                          disabled={inviteLoading}
+                          className="w-full px-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        >
+                          <option value="credits">积分令牌</option>
+                          <option value="rose">玫瑰令牌</option>
+                        </select>
+                      </div>
+                      
                       <input
                         type="text"
                         value={inviteCodeInput}
                         onChange={handleInviteCodeChange}
-                        placeholder="请输入兑换令牌"
+                        placeholder={`请输入${exchangeType === 'credits' ? '积分' : '玫瑰'}兑换令牌`}
                         className="w-full px-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent mb-3"
                         disabled={inviteLoading}
                       />
@@ -390,7 +441,7 @@ const handleClaimRose = async () => {
                             验证中...
                           </>
                         ) : (
-                          '确认兑换'
+                          `兑换${exchangeType === 'credits' ? '积分' : '玫瑰'}`
                         )}
                       </button>
                       
@@ -418,61 +469,7 @@ const handleClaimRose = async () => {
         </div>
       </div>
 
-      {/* PLUS SUBSCRIPTION MODAL（原有逻辑完全不变） */}
-      {isPlusModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-12 overflow-hidden">
-          <div
-            className="absolute inset-0 bg-black/80 backdrop-blur-xl animate-in fade-in duration-500 cursor-pointer"
-            onClick={closeModal}
-          />
-          <div
-            className="relative w-full max-w-xl bg-[#0F1014] border border-white/10 rounded-[3rem] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.7)] animate-in zoom-in-95 slide-in-from-bottom-10 duration-500 z-10"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={closeModal}
-              className="absolute top-8 right-8 z-50 p-4 bg-white/5 hover:bg-white/10 text-slate-500 hover:text-white rounded-2xl transition-all active:scale-90"
-              aria-label="关闭弹窗"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-            <div className="relative p-10 text-center">
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-40 bg-amber-500/10 blur-[100px] rounded-full" />
-              <div className="relative z-10 w-24 h-24 bg-gradient-to-br from-amber-400 via-amber-200 to-amber-600 rounded-[2rem] mx-auto flex items-center justify-center shadow-lg mb-8">
-                <svg className="w-12 h-12 text-amber-900" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                </svg>
-              </div>
-              <h2 className="text-4xl font-black text-white tracking-tighter leading-none">AI写真馆 PLUS</h2>
-              <p className="text-slate-500 mt-3 text-sm font-medium tracking-wide">解锁前所未有的智能创作体验</p>
-            </div>
-
-            <div className="px-10 pb-12 space-y-3">
-              {[
-                { id: 'year', name: '年度黄金会员', price: '¥168', tag: '省 ¥180', best: true },
-                { id: 'month', name: '月度体验会员', price: '¥19', tag: '灵活之选', best: false },
-              ].map(plan => (
-                <div
-                  key={plan.id}
-                  onClick={() => handleSubscribe(plan.name)}
-                  className={`relative cursor-pointer p-6 rounded-[2rem] border-2 transition-all flex items-center justify-between group ${plan.best ? 'bg-amber-400 border-amber-300 shadow-xl' : 'bg-slate-900 border-white/5 hover:border-amber-400/30'}`}
-                >
-                  <div>
-                    <p className={`text-sm font-black ${plan.best ? 'text-amber-950' : 'text-white'}`}>{plan.name}</p>
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${plan.best ? 'bg-amber-950 text-amber-400' : 'bg-white/10 text-slate-400'}`}>{plan.tag}</span>
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-xl font-black ${plan.best ? 'text-amber-950' : 'text-white'}`}>{plan.price}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 🔥 移除PLUS订阅模态框代码 */}
 
       {/* 样式保留 */}
       <style>{`
@@ -484,6 +481,11 @@ const handleClaimRose = async () => {
         @keyframes shimmer { to { transform: translateX(100%); } }
         @keyframes spin { to { transform: rotate(360deg); } }
         .animate-spin { animation: spin 1s linear infinite; }
+        .glass-effect {
+          background: rgba(255, 255, 255, 0.8);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+        }
       `}</style>
     </header>
   );

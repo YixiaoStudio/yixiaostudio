@@ -323,10 +323,16 @@ const MyGallery: React.FC = () => {
   const [isSharing, setIsSharing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [imageErrorCount, setImageErrorCount] = useState(0); // 限制图片错误日志输出
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null); // 新增：跟踪当前登录用户ID
   
   // ========== 新增：大图预览相关状态 ==========
   const [isImageModalOpen, setIsImageModalOpen] = useState(false); // 是否显示大图预览
   const [currentPreviewImage, setCurrentPreviewImage] = useState(''); // 当前预览的图片URL
+  
+  // 🔥 新增：防止无限加载的控制变量
+  const reloadCountRef = useRef(0); // 记录重新加载次数
+  const lastReloadUserIdRef = useRef<number | null>(null); // 记录上次加载的用户ID
+  const reloadDebounceTimerRef = useRef<NodeJS.Timeout | null>(null); // 防抖定时器
   
   // 🔥 修复：使用ref保存状态，避免闭包捕获过期值导致的Hook异常
   const itemsRef = useRef<GalleryItem[]>([]);
@@ -444,8 +450,108 @@ const MyGallery: React.FC = () => {
       clearTimeout(initTimer);
       itemsRef.current = [];
       (loadGalleryData as any).currentExecuting = false; // 释放锁
+      
+      // 清理防抖定时器
+      if (reloadDebounceTimerRef.current) {
+        clearTimeout(reloadDebounceTimerRef.current);
+      }
     };
   }, [loadGalleryData]);
+
+  // ========== 修复：监听用户登录状态变化（核心解决无限循环问题） ==========
+  useEffect(() => {
+    // 更新用户ID并处理登录/退出登录逻辑
+    const updateUserState = () => {
+      const userId = getCurrentUserId();
+      setCurrentUserId(userId);
+      
+      // 情况1：用户退出登录（userId变为null）- 清空所有本地数据
+      if (userId === null) {
+        console.log('[MyGallery] 检测到用户退出登录，开始清空本地图库数据');
+        // 清空页面状态
+        setItems([]);
+        itemsRef.current = [];
+        setSelectedItem(null);
+        setIsImageModalOpen(false);
+        // 清空本地存储
+        localStorage.removeItem('ai-photo-gallery');
+        // 清除所有同步标记
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('synced_')) {
+            localStorage.removeItem(key);
+          }
+        });
+        // 重置加载计数
+        reloadCountRef.current = 0;
+        lastReloadUserIdRef.current = null;
+        console.log('[MyGallery] 本地图库数据已清空');
+      } 
+      // 情况2：用户重新登录 - 只有满足以下条件才重新加载
+      else if (userId !== null) {
+        // 重置条件：用户ID变化 或 加载次数未超过限制（最多2次）
+        const shouldReload = 
+          userId !== lastReloadUserIdRef.current || 
+          (reloadCountRef.current < 2 && items.length === 0 && !loading);
+        
+        if (shouldReload) {
+          // 防抖处理：避免短时间内多次触发
+          if (reloadDebounceTimerRef.current) {
+            clearTimeout(reloadDebounceTimerRef.current);
+          }
+          
+          reloadDebounceTimerRef.current = setTimeout(() => {
+            // 检查执行锁，避免重复加载
+            if (!(loadGalleryData as any).currentExecuting) {
+              console.log(`[MyGallery] 检测到用户${userId}登录/状态变化，重新加载云端图库数据（第${reloadCountRef.current + 1}次）`);
+              loadGalleryData();
+              reloadCountRef.current += 1;
+              lastReloadUserIdRef.current = userId;
+            }
+          }, 1000); // 1秒防抖
+        }
+      }
+    };
+
+    // 初始执行一次
+    updateUserState();
+
+    // 监听localStorage变化（用户退出/登录时触发）
+    const handleStorageChange = (e: StorageEvent) => {
+      const userKeys = ['ai-current-user', 'ai_photo_generator_user', 'ai-user-profile'];
+      if (userKeys.includes(e.key || '')) {
+        updateUserState();
+      }
+    };
+
+    // 监听页面可见性变化（切换标签/返回页面时检查）
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updateUserState();
+      }
+    };
+
+    // 监听窗口焦点变化
+    const handleFocus = () => {
+      updateUserState();
+    };
+
+    // 绑定事件监听
+    window.addEventListener('storage', handleStorageChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    // 组件卸载时清理监听
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      
+      // 清理防抖定时器
+      if (reloadDebounceTimerRef.current) {
+        clearTimeout(reloadDebounceTimerRef.current);
+      }
+    };
+  }, [items.length, loading, loadGalleryData]);
 
   // ========== 核心修复：删除作品（使用ref避免闭包问题 + 加锁） ==========
   const deleteItem = useCallback(async (id: string | number, e: React.MouseEvent) => {
@@ -497,6 +603,9 @@ const MyGallery: React.FC = () => {
         }
       });
     }
+    
+    // 重置加载计数，允许重新加载
+    reloadCountRef.current = 0;
     
     // 加锁避免重复刷新
     if (!(loadGalleryData as any).currentExecuting) {
@@ -642,6 +751,9 @@ const MyGallery: React.FC = () => {
       // 5. 关闭所有弹窗
       setSelectedItem(null);
       setIsImageModalOpen(false);
+      
+      // 重置加载计数
+      reloadCountRef.current = 0;
       
       // 6. 重新加载数据（确认清空，加锁避免重复）
       if (!(loadGalleryData as any).currentExecuting) {

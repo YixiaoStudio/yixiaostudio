@@ -9,7 +9,7 @@ export const ALL_TASKS_CONFIG: Omit<DailyTask, 'current'>[] = [
   { id: 'like', type: 'daily', title: '社区互动', description: '给喜欢的作品点个赞', points: 5, limit: 10, icon: '❤️', color: 'from-rose-400 to-red-500' },
   { id: 'comment', type: 'daily', title: '友善评论', description: '在评论区交流心得', points: 10, limit: 3, icon: '💬', color: 'from-amber-400 to-orange-500' },
   { id: 'travel', type: 'daily', title: '环球打卡', description: '在旅行地图生成一张异国写真', points: 100, limit: 1, icon: '🌍', color: 'from-emerald-400 to-teal-600' },
-  
+
   // 每周任务 (New)
   { id: 'weekly_explore', type: 'weekly', title: '本周探险家', description: '本周内点亮 3 个不同的旅行目的地', points: 500, limit: 3, icon: '🎒', color: 'from-indigo-600 to-purple-700' },
   { id: 'weekly_creator', type: 'weekly', title: '高产创作者', description: '本周内累计创作 15 件写真作品', points: 300, limit: 15, icon: '🌟', color: 'from-fuchsia-500 to-pink-600' },
@@ -205,12 +205,122 @@ const travelTemplates: Template[] = [
     subtitle: '雪道飞驰的冬日欢歌',
     description: ' 身着滑雪服，驰骋在银装素裹的雪场，尽享冬日运动的酣畅快意。',
     coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0001.jpg',
-    tags: ['滑雪','雪场','冬日'],
+    tags: ['滑雪', '雪场', '冬日'],
     coordinates: { lat: 34.3416, lng: 108.9398 },
     usageCount: 18900
   },
-    {
+  {
     id: '0004',
+    category: '旅拍',
+    title: '长安寻迹',
+    subtitle: '古都的千年风华',
+    description: '身着汉服，漫步在西安的古街巷弄，感受历史与现代的交融。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0004.jpg',
+    tags: ['西安', '古都', '汉服'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 18800
+  },
+  {
+    id: '0005',
+    category: '旅拍',
+    title: '老上海名媛',
+    subtitle: '沪上的摩登风华',
+    description: '身着复古旗袍，徜徉在老上海的石库门弄堂，邂逅百年的摩登与优雅。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0005.jpg',
+    tags: ['老上海', '名媛', '旗袍'],
+    coordinates: { lat: 31.2304, lng: 121.4737 },
+    usageCount: 18700
+  },
+  {
+    id: '0006',
+    category: '女神',
+    title: '我如果是女老板',
+    subtitle: '职场高阶，锋芒尽显',
+    description: '身着干练穿搭，置身都市商务场景，彰显独立自信的女性力量。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0006.jpg',
+    tags: ['女老板', '职场', '干练'],
+    coordinates: { lat: 31.2304, lng: 121.4737 },
+    usageCount: 18600
+  },
+  {
+    id: '0007',
+    category: '旅拍',
+    title: '成都漫叙',
+    subtitle: '蜀地闲情，入画生香',
+    description: '身着蜀绣旗袍，漫步成都的宽窄巷陌，邂逅天府之国的烟火与闲适。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0007.jpg',
+    tags: ['成都', '休闲', '熊猫'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 18500
+  },
+  {
+    id: '0008',
+    category: '旅拍',
+    title: '敦煌飞天仙韵',
+    subtitle: '飞天踏云，古韵盈怀',
+    description: '身着飞天襦裙，飘带翩跹于大漠戈壁之间，邂逅丝路遗韵与飞天的灵动之美。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0008.jpg',
+    tags: ['敦煌', '飞天', '大漠'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 18400
+  },
+    {
+    id: '0009',
+    category: '女神',
+    title: '霍格沃茨・魔法绮梦',
+    subtitle: '化身巫师，畅游霍格沃茨',
+    description: '身着魔法袍，徜徉在霍格沃茨的城堡街巷，邂逅魔法世界的奇幻与浪漫。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0009.jpg',
+    tags: ['霍格沃茨', '魔法', '奇幻'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 18300
+  },
+      {
+    id: '0010',
+    category: '旅拍',
+    title: '新加坡寻迹',
+    subtitle: '狮城的南洋风情',
+    description: '漫步新加坡的街巷滨海，感受南洋风情与现代都市的交融。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0010.jpg',
+    tags: ['新加坡', '狮城', '南洋'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 18200
+  },
+        {
+    id: '0011',
+    category: '旅拍',
+    title: '波多黎各寻迹',
+    subtitle: '海岛的热带风情',
+    description: '身着度假风穿搭，漫步波多黎各的彩色街巷与海滩，感受加勒比的热烈与浪漫。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0011.jpg',
+    tags: ['波多黎各', '海岛', '热带'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 18100
+  },
+          {
+    id: '0012',
+    category: '旅拍',
+    title: '墨西哥复活节',
+    subtitle: '拉美色彩狂欢季',
+    description: '参与墨西哥复活节的民俗庆典，感受拉美文化的热烈与鲜活。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0012.jpg',
+    tags: ['墨西哥', '复活节', '狂欢'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 18000
+  },
+            {
+    id: '0013',
+    category: '旅拍',
+    title: '马尔代夫寻迹',
+    subtitle: '海岛的澄澈之美',
+    description: '徜徉马尔代夫的海岛椰林，感受碧海白沙的澄澈与浪漫。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0013.jpg',
+    tags: ['马尔代夫', '海岛', '度假'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 17900
+  },
+  {
+    id: '0020',
     category: '旅拍',
     title: '梦回长安不夜城',
     locationName: '中国 · 西安',
@@ -269,24 +379,24 @@ const travelTemplates: Template[] = [
     coordinates: { lat: 29.6469, lng: 91.1172 },
     usageCount: 13900
   },
-    {
+  {
     id: '0002',
     category: '男孩',
     title: '儿童未来职业照',
     subtitle: '童心筑梦的职业畅想',
     description: '身着职业装，置身专属职业场景，定格童年的美好职业期许',
     coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0002.jpg',
-    tags: ['儿童职业照','童梦启航','成长纪念'],
+    tags: ['儿童职业照', '童梦启航', '成长纪念'],
     usageCount: 17800
   },
-      {
+  {
     id: '0003',
     category: '女孩',
     title: '儿童未来职业照',
     subtitle: '童心筑梦的职业畅想',
     description: '身着职业装，置身专属职业场景，定格童年的美好职业期许',
     coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0003.jpg',
-    tags: ['儿童职业照','童梦启航','成长纪念'],
+    tags: ['儿童职业照', '童梦启航', '成长纪念'],
     usageCount: 17800
   },
   {
@@ -342,7 +452,7 @@ const travelTemplates: Template[] = [
 const generateTemplates = (): Template[] => {
   const categories: Exclude<import('./types').Category, '全部'>[] = ['女神', '男神', '女孩', '男孩', '商家'];
   const allTemplates: Template[] = [...travelTemplates];
-  
+
   for (let i = 0; i < 40; i++) {
     const category = categories[i % categories.length];
     const id = `${category}-${i}`;
