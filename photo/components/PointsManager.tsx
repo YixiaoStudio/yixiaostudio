@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 
 // 定义积分相关的类型接口（保留原有，补充注释）
@@ -51,6 +51,10 @@ const PointsManager: React.FC<PointsManagerProps> = ({
   claimLoading, // 领取loading状态
   refreshPoints // 手动刷新方法（新增，移除可选标记）
 }) => {
+  // 🔥 核心修复：添加React Ref替代document.querySelector，符合React最佳实践
+  const roseAddBtnRef = useRef<HTMLButtonElement>(null); // 玫瑰+号按钮Ref
+  const creditsAddBtnRef = useRef<HTMLButtonElement>(null); // 积分+号按钮Ref
+
   // 🔥 核心重构：localProfile完全依赖props.profile，不再有本地初始化逻辑
   const [localProfile, setLocalProfile] = useState<PointsProfile>({
     points: 0,
@@ -112,7 +116,7 @@ const PointsManager: React.FC<PointsManagerProps> = ({
     }
   };
 
-  // 🔥 核心修复：领取每日水晶玫瑰 - 领取后立即刷新后端数据，增加loading防重复点击
+  // 🔥 核心修复：领取每日水晶玫瑰 - 修复数值计算+React Ref隐藏按钮
   const claimDailyRose = async () => {
     if (claimLoading.rose) return; // 加载中禁止点击
     
@@ -121,8 +125,14 @@ const PointsManager: React.FC<PointsManagerProps> = ({
     const claimedDate = profile.lastRoseClaimDate 
       ? new Date(profile.lastRoseClaimDate).toISOString().split('T')[0] 
       : '';
+    
+    // 已领取时直接提示并隐藏+号
     if (claimedDate === today) {
       alert('今日水晶玫瑰已领取，明天再来吧！');
+      // 使用Ref隐藏玫瑰+号按钮（React最佳实践）
+      if (roseAddBtnRef.current) {
+        roseAddBtnRef.current.style.display = 'none';
+      }
       return;
     }
     
@@ -134,15 +144,27 @@ const PointsManager: React.FC<PointsManagerProps> = ({
       
       // 格式化显示的数值，提升用户体验
       const currentRose = parseFloat((profile.crystalRoses || 0).toFixed(1));
-      const afterClaimRose = parseFloat((currentRose + 0.5).toFixed(1));
-      const displayAfterRose = formatRoseNumber(afterClaimRose);
-      
       let tipMsg = '';
-      if (afterClaimRose >= 3.0) {
-        tipMsg = `今日玫瑰已领取，当前玫瑰(${displayAfterRose})已达上限，无需补充🌹`;
+      let displayAfterRose = '';
+      let afterClaimRose = 0;
+
+      // 🔥 核心修复：先判断当前值是否达上限，再决定是否加法（解决4显示4.5的问题）
+      if (currentRose >= 3.0) {
+        displayAfterRose = formatRoseNumber(currentRose);
+        tipMsg = `刷新页面可再次领取今日玫瑰！`;
       } else {
+        afterClaimRose = parseFloat((currentRose + 0.5).toFixed(1));
+        displayAfterRose = formatRoseNumber(afterClaimRose);
         tipMsg = `获得0.5个水晶玫瑰🌹，当前玫瑰数：${displayAfterRose}`;
       }
+
+      // 🔥 核心修复：使用Ref隐藏+号按钮（达到上限则隐藏）
+      if (roseAddBtnRef.current) {
+        if (currentRose >= 3.0 || afterClaimRose >= 3.0) {
+          roseAddBtnRef.current.style.display = 'none';
+        }
+      }
+
       alert(tipMsg);
     } catch (error) {
       console.error('领取玫瑰失败:', error);
@@ -150,7 +172,7 @@ const PointsManager: React.FC<PointsManagerProps> = ({
     }
   };
 
-  // 🔥 核心修复：领取每日积分点 - 领取后立即刷新后端数据，增加loading防重复点击
+  // 🔥 核心修复：领取每日积分点 - 补充Ref隐藏按钮逻辑
   const claimDailyCredits = async () => {
     if (claimLoading.credits) return; // 加载中禁止点击
     
@@ -158,8 +180,14 @@ const PointsManager: React.FC<PointsManagerProps> = ({
     const claimedDate = profile.lastCreditsClaimDate || profile.lastPointsClaimDate
       ? new Date(profile.lastCreditsClaimDate || profile.lastPointsClaimDate!).toISOString().split('T')[0]
       : '';
+    
+    // 已领取时直接提示并隐藏+号
     if (claimedDate === today) {
       alert('今日积分点已领取，明天再来吧！');
+      // 使用Ref隐藏积分+号按钮
+      if (creditsAddBtnRef.current) {
+        creditsAddBtnRef.current.style.display = 'none';
+      }
       return;
     }
 
@@ -173,6 +201,11 @@ const PointsManager: React.FC<PointsManagerProps> = ({
         ? `积分点已补至10个✨` 
         : `今日积分已领取，当前积分(${profile.credits})已达上限，无需补充✨`;
       alert(tipMsg);
+
+      // 隐藏积分+号按钮（达到上限则隐藏）
+      if (creditsAddBtnRef.current && profile.credits >= 10) {
+        creditsAddBtnRef.current.style.display = 'none';
+      }
     } catch (error) {
       console.error('领取积分失败:', error);
       alert('领取失败，请稍后重试！');
@@ -253,7 +286,7 @@ const PointsManager: React.FC<PointsManagerProps> = ({
     }
   };
 
-  // JSX结构：保留原有样式，新增手动刷新按钮，玫瑰数直接用格式化后的props值
+  // JSX结构：保留原有样式，绑定Ref到+号按钮，修复数据显示
   return (
     <div className="flex items-center space-x-1.5">
       {/* 积分点按钮 - 含每日领取功能 */}
@@ -273,9 +306,10 @@ const PointsManager: React.FC<PointsManagerProps> = ({
           </div>
         </Link>
         
-        {/* 每日领取积分点按钮 */}
+        {/* 每日领取积分点按钮 - 绑定Ref */}
         {canClaimCredits() && (
           <button
+            ref={creditsAddBtnRef} // 绑定积分+号按钮Ref
             onClick={claimDailyCredits}
             disabled={claimLoading.credits}
             className="absolute -top-2 -right-2 w-5 h-5 bg-green-500 text-white rounded-full flex items-center justify-center text-[8px] font-bold shadow-md hover:bg-green-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
@@ -306,9 +340,10 @@ const PointsManager: React.FC<PointsManagerProps> = ({
           </div>
         </div>
         
-        {/* 每日领取玫瑰按钮 */}
+        {/* 每日领取玫瑰按钮 - 绑定Ref */}
         {canClaimRose() && (
           <button
+            ref={roseAddBtnRef} // 绑定玫瑰+号按钮Ref
             onClick={claimDailyRose}
             disabled={claimLoading.rose}
             className="absolute -top-2 -right-2 w-5 h-5 bg-pink-500 text-white rounded-full flex items-center justify-center text-[8px] font-bold shadow-md hover:bg-pink-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
