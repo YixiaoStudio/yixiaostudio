@@ -207,7 +207,7 @@ const travelTemplates: Template[] = [
     coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0001.jpg',
     tags: ['滑雪', '雪场', '冬日'],
     coordinates: { lat: 34.3416, lng: 108.9398 },
-    usageCount: 18900
+    usageCount: 27100
   },
   {
     id: '0004',
@@ -223,18 +223,18 @@ const travelTemplates: Template[] = [
   {
     id: '0005',
     category: '旅拍',
-    title: '老上海名媛',
-    subtitle: '沪上的摩登风华',
+    title: '沪上风华',
+    subtitle: '十里洋场，沪上的摩登风华',
     description: '身着复古旗袍，徜徉在老上海的石库门弄堂，邂逅百年的摩登与优雅。',
     coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0005.jpg',
     tags: ['老上海', '名媛', '旗袍'],
     coordinates: { lat: 31.2304, lng: 121.4737 },
-    usageCount: 18700
+    usageCount: 26900
   },
   {
     id: '0006',
     category: '女神',
-    title: '我如果是女老板',
+    title: '我是世界500强的女老板',
     subtitle: '职场高阶，锋芒尽显',
     description: '身着干练穿搭，置身都市商务场景，彰显独立自信的女性力量。',
     coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0006.jpg',
@@ -251,7 +251,7 @@ const travelTemplates: Template[] = [
     coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0007.jpg',
     tags: ['成都', '休闲', '熊猫'],
     coordinates: { lat: 34.3416, lng: 108.9398 },
-    usageCount: 18500
+    usageCount: 17500
   },
   {
     id: '0008',
@@ -262,9 +262,9 @@ const travelTemplates: Template[] = [
     coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0008.jpg',
     tags: ['敦煌', '飞天', '大漠'],
     coordinates: { lat: 34.3416, lng: 108.9398 },
-    usageCount: 18400
+    usageCount: 26810
   },
-    {
+  {
     id: '0009',
     category: '女神',
     title: '霍格沃茨・魔法绮梦',
@@ -275,7 +275,7 @@ const travelTemplates: Template[] = [
     coordinates: { lat: 34.3416, lng: 108.9398 },
     usageCount: 18300
   },
-      {
+  {
     id: '0010',
     category: '旅拍',
     title: '新加坡寻迹',
@@ -286,7 +286,7 @@ const travelTemplates: Template[] = [
     coordinates: { lat: 34.3416, lng: 108.9398 },
     usageCount: 18200
   },
-        {
+  {
     id: '0011',
     category: '旅拍',
     title: '波多黎各寻迹',
@@ -297,7 +297,7 @@ const travelTemplates: Template[] = [
     coordinates: { lat: 34.3416, lng: 108.9398 },
     usageCount: 18100
   },
-          {
+  {
     id: '0012',
     category: '旅拍',
     title: '墨西哥复活节',
@@ -308,7 +308,7 @@ const travelTemplates: Template[] = [
     coordinates: { lat: 34.3416, lng: 108.9398 },
     usageCount: 18000
   },
-            {
+  {
     id: '0013',
     category: '旅拍',
     title: '马尔代夫寻迹',
@@ -317,10 +317,87 @@ const travelTemplates: Template[] = [
     coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0013.jpg',
     tags: ['马尔代夫', '海岛', '度假'],
     coordinates: { lat: 34.3416, lng: 108.9398 },
-    usageCount: 17900
+    usageCount: 27200
   },
   {
+    id: '0014',
+    category: '女神',
+    title: '乐园绮梦',
+    subtitle: '童话里的浪漫时光',
+    description: '身着甜美穿搭，漫步梦幻乐园之中，邂逅童真与欢乐的美好瞬间。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0014.jpg',
+    tags: ['乐园', '童话', '浪漫'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 17800
+  },
+  {
+    id: '0015',
+    category: '女孩',
+    title: '粉色蛋糕派对',
+    subtitle: '甜妹的梦幻时刻',
+    description: '身着粉色蓬蓬裙，置身蛋糕与气球的梦幻场景，捕捉甜妹的俏皮与灵动。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0015.jpg',
+    tags: ['蛋糕', '派对', '梦幻'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 17800
+  },
+  {
+    id: '0016',
+    category: '男孩',
+    title: '小蜘蛛奇遇记',
+    subtitle: '童趣的冒险之旅',
+    description: '化身小小蜘蛛侠，穿梭在充满奇幻色彩的场景中，开启一场充满勇气与惊喜的冒险。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0016.jpg',
+    tags: ['蜘蛛侠', '童趣', '冒险'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 17810
+  },
+  {
+    id: '0017',
+    category: '商家',
+    title: '儿童糖画',
+    subtitle: '舌尖上的非遗',
+    description: '手持晶莹的糖画，在老巷的糖画摊前驻足，感受传统手艺的甜香与童趣。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0017.jpg',
+    tags: ['糖画', '非遗', '童趣'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 17600
+  },
+  {
+    id: '0018',
+    category: '女神',
+    title: '解锁新座驾',
+    subtitle: '奔赴自由新旅程',
+    description: '驰骋万里，平安顺遂。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0018.jpg',
+    tags: ['车', '自由', '旅程'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 26800
+  },
+  {
+    id: '0019',
+    category: '女神',
+    title: '小奶汪的精致SPA',
+    subtitle: '生活小美好・萌宠日记',
+    description: '用心呵护爱宠，温柔洗护，定格温馨治愈的日常瞬间。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0019.jpg',
+    tags: ['宠物', 'SPA', '治愈'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 27000
+  },
+    {
     id: '0020',
+    category: '女神',
+    title: '鎏光度假之夜',
+    subtitle: '奢享度假慢时光',
+    description: '置身奢华酒店，定格精致优雅的轻奢瞬间，尽享品质生活。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0020.jpg',
+    tags: ['酒店', '轻奢', '优雅'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 27300
+  },
+  {
+    id: '0023',
     category: '旅拍',
     title: '梦回长安不夜城',
     locationName: '中国 · 西安',
