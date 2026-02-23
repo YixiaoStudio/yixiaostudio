@@ -328,6 +328,10 @@ const Header: React.FC<HeaderProps> = ({
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.3} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
             <span>每日任务</span>
           </Link>
+                    <Link to="/create-template" className={`flex items-center space-x-1.5 transition-colors py-2 border-b-2 ${location.pathname === '/create-template' ? 'text-indigo-600 border-indigo-600' : 'border-transparent hover:text-indigo-600'}`}>
+             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.3} d="M12 4v16m8-8H4" /></svg>
+             <span>制作模版</span>
+          </Link>
         </nav>
 
         {/* User Area（🔥 修改PLUS按钮点击事件，补全截断代码） */}
@@ -396,6 +400,7 @@ const Header: React.FC<HeaderProps> = ({
                       setIsMenuOpen(false);
                       resetInviteState();
                     }} className="block px-5 py-2.5 text-sm font-black text-gray-700 hover:bg-gray-50">个人中心</Link>
+                                    <Link to="/create-template" onClick={() => setIsMenuOpen(false)} className="block px-5 py-2.5 text-sm font-black text-indigo-600 hover:bg-indigo-50">制作模版</Link>
                     
                     <Link to="/gallery" onClick={() => {
                       setIsMenuOpen(false);

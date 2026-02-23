@@ -10,6 +10,50 @@ const SAVE_GENERATED_IMAGE_API = `${API_BASE_URL}/api/save-generated-image`;
 const DELETE_GENERATED_IMAGE_API = `${API_BASE_URL}/api/delete-generated-image`;
 const CHECK_IMAGE_EXIST_API = `${API_BASE_URL}/api/check-image-exist`; // 新增：检查图片是否存在
 
+// ========== 核心优化：生成高精度时间戳（到毫秒） ==========
+/**
+ * 生成精确到毫秒的ISO格式时间戳
+ * @returns string 如 "2026-02-23T15:30:45.123Z"
+ */
+const generatePreciseTimestamp = (): string => {
+  return new Date().toISOString();
+};
+
+// ========== 优化：按毫秒级时间降序排序的工具函数（核心修改：高精度排序） ==========
+/**
+ * 按时间降序排序图库图片（新生成的排在前面）
+ * @param items GalleryItem[] 待排序的图片列表
+ * @returns GalleryItem[] 排序后的图片列表
+ */
+const sortGalleryItemsByTimeDesc = (items: GalleryItem[]): GalleryItem[] => {
+  const sortedItems = [...items].sort((a, b) => {
+    // 确保timestamp是有效的高精度日期格式，解析到毫秒
+    const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+    const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+    // 降序排列：时间大的（新的）排在前面，毫秒级精度对比
+    return timeB - timeA;
+  });
+  
+  // 打印排序日志，显示精确到秒的时间，方便验证
+  console.log('[排序结果] 图片按时间降序排列（新→旧）：', sortedItems.map(item => ({
+    id: item.id,
+    templateTitle: item.templateTitle,
+    time: new Date(item.timestamp).toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }),
+    timestamp: item.timestamp,
+    timeMs: new Date(item.timestamp).getTime()
+  })));
+  
+  return sortedItems;
+};
+
 // ========== 新增：过滤无效图片的工具函数（增强版） ==========
 /**
  * 过滤无效/生成失败/已删除的图片
@@ -97,7 +141,7 @@ export const getCurrentUserId = (): number | null => {
   }
 };
 
-// ========== 重构：从后端获取用户图片（过滤已删除的图片） ==========
+// ========== 重构：从后端获取用户图片（优化时间戳格式） ==========
 export const fetchGeneratedImages = async (userId: number): Promise<GalleryItem[]> => {
   try {
     if (!userId) {
@@ -130,7 +174,7 @@ export const fetchGeneratedImages = async (userId: number): Promise<GalleryItem[
     const data = await res.json();
     console.log(`[fetchGeneratedImages] 从后端获取生成图片：`, data);
     
-    // 适配格式 + 过滤无效图片 + 检查图片是否真的存在
+    // 适配格式 + 过滤无效图片 + 标准化时间戳
     if (data.code === 0 && Array.isArray(data.data)) {
       const validItems: GalleryItem[] = [];
       // 🔥 修复：改用for循环，避免Promise.all导致的Hook调用异常
@@ -143,12 +187,32 @@ export const fetchGeneratedImages = async (userId: number): Promise<GalleryItem[
         
         // 只保留有有效图片的项
         if (validImages.length > 0) {
+          // 标准化时间戳：确保是高精度ISO格式
+          let itemTimestamp = item.timestamp;
+          if (!itemTimestamp) {
+            // 如果后端没有返回时间戳，使用图片ID中的时间或生成新的
+            itemTimestamp = item.id && /\d{13}/.test(item.id) 
+              ? new Date(Number(/\d{13}/.exec(item.id)[0])).toISOString()
+              : generatePreciseTimestamp();
+          } else if (typeof itemTimestamp === 'number') {
+            // 如果是数字时间戳（毫秒），转换为ISO格式
+            itemTimestamp = new Date(itemTimestamp).toISOString();
+          } else if (!itemTimestamp.includes('T') || !itemTimestamp.includes('.')) {
+            // 如果是不标准的时间字符串，尝试修复为高精度格式
+            try {
+              itemTimestamp = new Date(itemTimestamp).toISOString();
+            } catch (e) {
+              itemTimestamp = generatePreciseTimestamp();
+            }
+          }
+          
           validItems.push({
-            id: item.id || `${item.templateId || 'temp'}-${item.timestamp || Date.now()}`,
+            id: item.id || `${item.templateId || 'temp'}-${Date.now()}`, // ID包含毫秒级时间，确保唯一
             templateId: item.templateId || '',
             templateTitle: item.templateTitle || '未知模板',
             images: validImages,
-            timestamp: item.timestamp ? new Date(item.timestamp).toISOString() : new Date().toISOString(),
+            // 核心优化：确保timestamp为高精度ISO格式（到毫秒）
+            timestamp: itemTimestamp,
             isPlus: item.isPlus || false,
             originalImage: { 
               tosUrl: item.originalImageUrl || '', 
@@ -159,7 +223,12 @@ export const fetchGeneratedImages = async (userId: number): Promise<GalleryItem[
       }
       
       // 🔥 新增：打印后端返回的图片ID和URL，用于排查
-      console.log(`[fetchGeneratedImages] 后端有效图片列表：`, validItems.map(i => ({ id: i.id, url: i.images[0] })));
+      console.log(`[fetchGeneratedImages] 后端有效图片列表：`, validItems.map(i => ({ 
+        id: i.id, 
+        url: i.images[0],
+        timestamp: i.timestamp,
+        timeMs: new Date(i.timestamp).getTime()
+      })));
       return validItems.filter(item => isValidGalleryItem(item));
     } else {
       console.error('[fetchGeneratedImages] 后端返回数据格式错误：', data);
@@ -171,7 +240,7 @@ export const fetchGeneratedImages = async (userId: number): Promise<GalleryItem[
   }
 };
 
-// ========== 重构：保存生成图片到后端（纯函数，无Hook依赖） ==========
+// ========== 重构：保存生成图片到后端（优化时间戳存储） ==========
 export const saveGeneratedImageToServer = async (userId: number, galleryItem: GalleryItem) => {
   // 增加防抖标记，避免重复保存
   const syncKey = `synced_${galleryItem.id}_${userId}`;
@@ -201,6 +270,9 @@ export const saveGeneratedImageToServer = async (userId: number, galleryItem: Ga
       return false;
     }
 
+    // 确保时间戳是高精度格式
+    const preciseTimestamp = galleryItem.timestamp || generatePreciseTimestamp();
+    
     const requestData = {
       userId,
       templateId: galleryItem.templateId,
@@ -208,11 +280,12 @@ export const saveGeneratedImageToServer = async (userId: number, galleryItem: Ga
       imageUrls: validImageUrls,
       isPlus: galleryItem.isPlus,
       originalImageUrl: galleryItem.originalImage?.tosUrl || '',
-      timestamp: new Date(galleryItem.timestamp).getTime(),
-      id: galleryItem.id // 🔥 新增：强制把本地ID传给后端，确保ID一致
+      timestamp: new Date(preciseTimestamp).getTime(), // 后端存储毫秒级时间戳
+      isoTimestamp: preciseTimestamp, // 新增：同时存储ISO格式时间戳
+      id: galleryItem.id || `${Date.now()}-${userId}` // ID包含毫秒级时间，确保唯一
     };
 
-    console.log('[saveGeneratedImageToServer] 发送请求数据：', requestData);
+    console.log('[saveGeneratedImageToServer] 发送请求数据（含高精度时间戳）：', requestData);
     const res = await fetch(SAVE_GENERATED_IMAGE_API, {
       method: 'POST',
       headers: {
@@ -340,7 +413,7 @@ const MyGallery: React.FC = () => {
     itemsRef.current = items;
   }, [items]);
 
-  // ========== 重构：加载图库数据（核心修复重复加载+URL去重） ==========
+  // ========== 重构：加载图库数据（核心修复重复加载+URL去重+高精度排序） ==========
   const loadGalleryData = useCallback(async () => {
     // 🔥 核心修复1：执行锁，避免重复调用
     if ((loadGalleryData as any).currentExecuting) return;
@@ -363,20 +436,25 @@ const MyGallery: React.FC = () => {
       const localItems: GalleryItem[] = savedStr ? JSON.parse(savedStr) : [];
       const validLocalItems = localItems.filter(item => isValidGalleryItem(item));
       
-      // 🔥 新增：打印本地图片列表（ID+URL），用于排查
-      console.log(`[loadGalleryData] 本地有效图片列表：`, validLocalItems.map(i => ({ id: i.id, url: i.images[0] })));
+      // 🔥 新增：打印本地图片列表（ID+URL+时间戳），用于排查
+      console.log(`[loadGalleryData] 本地有效图片列表：`, validLocalItems.map(i => ({ 
+        id: i.id, 
+        url: i.images[0],
+        timestamp: i.timestamp,
+        timeMs: new Date(i.timestamp).getTime()
+      })));
       
-      // 3. 合并数据 + 双重去重（先ID去重，再URL去重）
+      // 3. 合并数据 + 双重去重（先ID去重，再URL去重） + 高精度排序
       const mergedItems = [...serverItems, ...validLocalItems];
       // 第一步：按ID去重
       const idDeduplicated = Array.from(new Map(mergedItems.map(item => [String(item.id), item])).values());
       // 第二步：按图片URL去重（核心解决同图不同ID问题）
-      const finalItems = deduplicateByImageUrl(idDeduplicated)
-        .filter(item => isValidGalleryItem(item))
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      const urlDeduplicated = deduplicateByImageUrl(idDeduplicated).filter(item => isValidGalleryItem(item));
+      // 第三步：核心优化：按毫秒级时间降序排序（新生成的在前）
+      const finalItems = sortGalleryItemsByTimeDesc(urlDeduplicated);
       
       // 🔥 新增：打印去重前后的数量，确认去重效果
-      console.log(`[loadGalleryData] 合并后数量：${mergedItems.length}，ID去重后：${idDeduplicated.length}，URL去重后：${finalItems.length}`);
+      console.log(`[loadGalleryData] 合并后数量：${mergedItems.length}，ID去重后：${idDeduplicated.length}，URL去重后：${urlDeduplicated.length}，排序后：${finalItems.length}`);
       
       // 4. 同步本地未同步的图片（只同步URL未在后端的图片）
       const syncLocalItems = async () => {
@@ -387,9 +465,14 @@ const MyGallery: React.FC = () => {
           const localImageUrl = localItem.images[0];
           // 只同步：本地图片URL不在后端 + 未标记过同步
           if (!serverImageUrls.includes(localImageUrl) && !localStorage.getItem(`synced_${localItem.id}_${userId}`)) {
-            const syncSuccess = await saveGeneratedImageToServer(userId, localItem);
+            // 确保本地图片有高精度时间戳
+            const itemWithPreciseTime = {
+              ...localItem,
+              timestamp: localItem.timestamp || generatePreciseTimestamp()
+            };
+            const syncSuccess = await saveGeneratedImageToServer(userId, itemWithPreciseTime);
             if (syncSuccess) {
-              console.log(`[MyGallery] 本地图片${localItem.id}（URL：${localImageUrl}）已同步到后端`);
+              console.log(`[MyGallery] 本地图片${localItem.id}（URL：${localImageUrl}）已同步到后端，时间戳：${itemWithPreciseTime.timestamp}`);
             } else {
               console.warn(`[MyGallery] 本地图片${localItem.id}（URL：${localImageUrl}）同步到后端失败`);
             }
@@ -403,17 +486,19 @@ const MyGallery: React.FC = () => {
       // 仅在组件挂载时更新状态
       if (isMounted) {
         setItems(finalItems);
-        localStorage.setItem('ai-photo-gallery', JSON.stringify(finalItems)); // 🔥 修复：本地存储去重后的数据
-        console.log(`[MyGallery] 加载完成，有效TOS图片数：${finalItems.length}`);
+        // 存储时保留高精度时间戳，确保刷新后排序不变
+        localStorage.setItem('ai-photo-gallery', JSON.stringify(finalItems)); 
+        console.log(`[MyGallery] 加载完成，有效TOS图片数：${finalItems.length}，已按毫秒级时间排序`);
       }
     } catch (err) {
       console.error('[MyGallery] 读取图库数据失败：', err);
       if (isMounted) {
         const savedStr = localStorage.getItem('ai-photo-gallery');
         const fallbackItems = savedStr ? JSON.parse(savedStr).filter(isValidGalleryItem) : [];
-        // 兜底也做URL去重
+        // 兜底也做URL去重 + 高精度排序
         const deduplicatedFallback = deduplicateByImageUrl(fallbackItems);
-        setItems(deduplicatedFallback);
+        const sortedFallback = sortGalleryItemsByTimeDesc(deduplicatedFallback); 
+        setItems(sortedFallback);
       }
     } finally {
       if (isMounted) {
@@ -553,7 +638,7 @@ const MyGallery: React.FC = () => {
     };
   }, [items.length, loading, loadGalleryData]);
 
-  // ========== 核心修复：删除作品（使用ref避免闭包问题 + 加锁） ==========
+  // ========== 核心修复：删除作品（使用ref避免闭包问题 + 加锁 + 高精度排序） ==========
   const deleteItem = useCallback(async (id: string | number, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!window.confirm('确定要从图库中永久删除这件作品吗？此操作不可恢复。')) return;
@@ -570,10 +655,12 @@ const MyGallery: React.FC = () => {
       // 2. 删本地数据（使用ref获取最新状态，避免闭包）
       const idStr = String(id);
       const updated = itemsRef.current.filter(item => String(item.id) !== idStr).filter(isValidGalleryItem);
-      // 删除后也做URL去重
+      // 删除后也做URL去重 + 核心优化：删除后重新按毫秒级时间排序
       const deduplicatedUpdated = deduplicateByImageUrl(updated);
-      setItems(deduplicatedUpdated);
-      localStorage.setItem('ai-photo-gallery', JSON.stringify(deduplicatedUpdated));
+      const sortedUpdated = sortGalleryItemsByTimeDesc(deduplicatedUpdated); 
+      setItems(sortedUpdated);
+      // 存储时保留高精度时间戳
+      localStorage.setItem('ai-photo-gallery', JSON.stringify(sortedUpdated)); 
       
       // 3. 关闭详情弹窗和大图预览
       if (selectedItem && String(selectedItem.id) === idStr) {
@@ -585,12 +672,12 @@ const MyGallery: React.FC = () => {
       if (!(loadGalleryData as any).currentExecuting) {
         await loadGalleryData();
       }
-      console.log(`[MyGallery] 图片${idStr}删除成功，当前有效TOS图片数：${deduplicatedUpdated.length}`);
+      console.log(`[MyGallery] 图片${idStr}删除成功，当前有效TOS图片数：${sortedUpdated.length}`);
     } else {
       alert('删除失败：后端数据未清理，请重试！');
       console.warn(`[MyGallery] 图片${id}后端删除失败`);
     }
-  }, [loadGalleryData, selectedItem]); // 🔥 修复：完善依赖数组
+  }, [loadGalleryData, selectedItem]); 
 
   // ========== 新增：手动刷新图库 ==========
   const handleRefresh = useCallback(async () => {
@@ -611,7 +698,7 @@ const MyGallery: React.FC = () => {
     if (!(loadGalleryData as any).currentExecuting) {
       await loadGalleryData();
     }
-    alert('图库已刷新为最新状态！');
+    alert('图库已刷新为最新状态！所有图片已按生成时间（精确到秒）重新排序');
   }, [loadGalleryData]);
 
   // ========== 单张图片下载 ==========
@@ -623,7 +710,9 @@ const MyGallery: React.FC = () => {
     try {
       const a = document.createElement('a');
       a.href = imageUrl;
-      const fileName = `${templateTitle}_${index + 1}_${new Date().getTime()}.jpg`;
+      // 文件名包含精确时间，便于区分
+      const preciseTime = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, -5);
+      const fileName = `${templateTitle}_${index + 1}_${preciseTime}.jpg`;
       a.download = fileName;
       a.target = '_blank';
       
@@ -659,7 +748,7 @@ const MyGallery: React.FC = () => {
     // 标记图片为失效，下次加载时过滤
     const imgUrl = imgElement.getAttribute('data-original-src') || imgElement.src;
     localStorage.setItem(`invalid_img_${btoa(imgUrl)}`, '1');
-  }, [imageErrorCount]); // 🔥 修复：添加必要依赖
+  }, [imageErrorCount]); 
 
   // ========== 分享功能 ==========
   const earnPoints = useCallback((taskId: string) => {
@@ -691,7 +780,7 @@ const MyGallery: React.FC = () => {
     setTimeout(() => {
       const posts: CommunityPost[] = JSON.parse(localStorage.getItem('ai-community-posts') || '[]');
       const newPost: CommunityPost = {
-        id: Date.now().toString(),
+        id: Date.now().toString(), // ID包含毫秒级时间，确保唯一
         userName: '我',
         userAvatar: 'https://i.pravatar.cc/150?u=me',
         imageUrl: imageUrl,
@@ -700,7 +789,7 @@ const MyGallery: React.FC = () => {
         templateTitle: selectedItem.templateTitle,
         likes: 0,
         comments: [],
-        timestamp: new Date().toISOString()
+        timestamp: generatePreciseTimestamp() // 使用高精度时间戳
       };
       
       localStorage.setItem('ai-community-posts', JSON.stringify([newPost, ...posts]));
@@ -828,7 +917,7 @@ const MyGallery: React.FC = () => {
               我的<span className="text-indigo-600">数字美术馆</span>
             </h1>
             <p className="mt-4 text-gray-400 font-medium max-w-lg">
-              这里收藏了您每一次与 AI 协作产生的艺术结晶。作品已同步至云端，跨设备均可访问。
+              这里收藏了您每一次与 AI 协作产生的艺术结晶。
             </p>
           </div>
           {/* 刷新 + 清空按钮组 */}
@@ -905,7 +994,18 @@ const MyGallery: React.FC = () => {
                       </svg>
                     </button>
                     <h4 className="text-white font-black text-lg truncate">{item.templateTitle}</h4>
-                    <p className="text-white/60 text-[10px] font-medium">{new Date(item.timestamp).toLocaleDateString()} · {item.images.length}张照片</p>
+                    {/* 优化：显示精确到秒的生成时间 */}
+                    <p className="text-white/60 text-[10px] font-medium">
+                      {new Date(item.timestamp).toLocaleString('zh-CN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                      })} · {item.images.length}张照片
+                    </p>
                   </div>
                 </div>
               </div>
@@ -922,7 +1022,18 @@ const MyGallery: React.FC = () => {
             <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-white">
                <div>
                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">{selectedItem.templateTitle}</h2>
-                 <p className="text-xs text-gray-400 font-medium">生成于 {new Date(selectedItem.timestamp).toLocaleString()}</p>
+                 {/* 优化：显示精确到秒的生成时间 */}
+                 <p className="text-xs text-gray-400 font-medium">
+                   生成于 {new Date(selectedItem.timestamp).toLocaleString('zh-CN', {
+                     year: 'numeric',
+                     month: '2-digit',
+                     day: '2-digit',
+                     hour: '2-digit',
+                     minute: '2-digit',
+                     second: '2-digit',
+                     hour12: false
+                   })}
+                 </p>
                </div>
                <button 
                 onClick={() => setSelectedItem(null)}

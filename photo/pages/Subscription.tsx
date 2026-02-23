@@ -82,20 +82,20 @@ const Subscription: React.FC = () => {
   const plans = [
     {
       id: 'early',
-      name: '早鸟 PLUS',
-      price: '14.9',
-      unit: '/ 月',
-      tag: '限时优惠',
-      desc: '适合初尝创作的新人',
-      best: false,
-    },
-    {
-      id: 'month',
       name: 'PLUS 月费',
       price: '19.9',
       unit: '/ 月',
       tag: '主推套餐',
       desc: '畅享所有核心高级功能',
+      best: false,
+    },
+    {
+      id: 'month',
+      name: '早鸟 PLUS',
+      price: '14.9',
+      unit: '/ 月',
+      tag: '限时优惠',
+      desc: '适合初尝创作的新人',
       best: true,
     },
     {
@@ -345,7 +345,7 @@ const Subscription: React.FC = () => {
           </div>
           <button
             className="w-full mt-5 py-3.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl font-black text-sm shadow-lg shadow-orange-950/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center space-x-2"
-            onClick={() => window.open('https://item.taobao.com/item.htm?id=1020137775226&spm=a213gs.v2success.0.0.5fc74831PJRLjF', '_blank')}
+            onClick={() => window.open('https://item.taobao.com/item.htm?ft=t&id=1021089451106&spm=a21dvs.23580594.0.0.76ac2c1bnKuvzZ', '_blank')}
           >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 100-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" /></svg>
             <span>前往淘宝下单</span>

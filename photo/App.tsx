@@ -8,7 +8,9 @@ import Profile from './pages/Profile';
 import Tasks from './pages/Tasks';
 import TravelMap from './pages/TravelMap';
 import Subscription from './pages/Subscription';
+import CreateTemplate from './pages/template-builder';
 import Header from './components/Header';
+import { UserProfile } from './types';
 // 导入积分类型
 import { PointsProfile } from './components/PointsManager';
 
@@ -28,7 +30,7 @@ export type GenerateType = 'single' | 'grid9';
 // ========== 新增：邮箱格式验证工具函数 ==========
 const isValidEmail = (email: string): boolean => {
   const emailRegex = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
-  return emailRegex.test(email);
+  return emailRegex.test(email);1
 };
 
 // ========== 提取独立的登录/注册模态框组件 ==========
@@ -1162,6 +1164,7 @@ const App: React.FC = () => {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/template/:id" element={<TemplateDetail handleGenerateImage={handleGenerateImage} profile={profile} />} />
+              <Route path="/create-template" element={<CreateTemplate />} />
               <Route path="/gallery" element={<MyGallery />} />
               <Route path="/community" element={<Community />} />
               <Route path="/profile" element={<Profile />} />

@@ -385,7 +385,7 @@ const travelTemplates: Template[] = [
     coordinates: { lat: 34.3416, lng: 108.9398 },
     usageCount: 27000
   },
-    {
+  {
     id: '0020',
     category: '女神',
     title: '鎏光度假之夜',
@@ -397,7 +397,52 @@ const travelTemplates: Template[] = [
     usageCount: 27300
   },
   {
+    id: '0021',
+    category: '旅拍',
+    title: '汉中寻迹',
+    locationName: '中国 · 汉中',
+    subtitle: '汉韵千年，寻迹汉中',
+    description: '漫步汉中山水间，感受两汉三国底蕴与自然美景相融。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0021.jpg',
+    tags: ['汉中', '三国', '汉服'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 18799
+  },
+  {
+    id: '0022',
+    category: '旅拍',
+    title: '学府风华',
+    subtitle: '青春与学府同框',
+    description: '漫步名校校园，定格青春与书香相伴的美好时刻。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0022.jpg',
+    tags: ['学府', '青春', '名校'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 18799
+  },
+  {
     id: '0023',
+    category: '商业',
+    title: '涂装实验室',
+    subtitle: '个性潮改焕新颜值',
+    description: '定制专属涂装贴图，为爱车焕新外观，打造独特出行潮范。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0023.jpg',
+    tags: ['涂装', '潮改', '个性'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 17450
+  },
+    {
+    id: '0024',
+    category: '商业',
+    title: '车衣创研社',
+    subtitle: '车漆焕新，颜值拉满',
+    description: '定制专属涂装贴图，为爱车焕新颜值，打造专属的个性出行风格。',
+    coverImage: 'https://yixiaostudio.tos-cn-beijing.volces.com/github-pages-templates/yixiaostudio.cn/Yixiao-Photo/z0024.jpg',
+    tags: ['私家车','涂装','改装'],
+    coordinates: { lat: 34.3416, lng: 108.9398 },
+    usageCount: 17400
+  },
+  {
+    id: '0099',
     category: '旅拍',
     title: '梦回长安不夜城',
     locationName: '中国 · 西安',

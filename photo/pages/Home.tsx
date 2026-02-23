@@ -10,6 +10,7 @@ const ITEMS_PER_PAGE = 20;
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState<Category | '热门'>('全部');
+  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [usageStats, setUsageStats] = useState<Record<string, number>>({});
 
@@ -18,7 +19,7 @@ const Home: React.FC = () => {
     // 加载实时热度统计
     const stats = JSON.parse(localStorage.getItem('ai-template-usage-stats') || '{}');
     setUsageStats(stats);
-  }, [activeCategory]);
+  }, [activeCategory, searchQuery]);
 
   // 合并热度并排序的逻辑
   const sortedTemplates = useMemo(() => {
@@ -27,18 +28,28 @@ const Home: React.FC = () => {
       usageCount: (t.usageCount || 0) + (usageStats[t.id] || 0)
     }));
 
+    let filtered = merged;
+    
+    // 搜索过滤
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(t => 
+        t.title.toLowerCase().includes(query) || 
+        t.tags.some(tag => tag.toLowerCase().includes(query))
+      );
+    }
+
     if (activeCategory === '热门') {
-      return [...merged].sort((a, b) => b.usageCount - a.usageCount);
+      return [...filtered].sort((a, b) => b.usageCount - a.usageCount);
     }
     
-    let filtered = merged;
     if (activeCategory !== '全部') {
-      filtered = merged.filter(t => t.category === activeCategory);
+      filtered = filtered.filter(t => t.category === activeCategory);
     }
     
     // 非热门分类默认按使用次数降序，让最受欢迎的排前面
     return [...filtered].sort((a, b) => b.usageCount - a.usageCount);
-  }, [activeCategory, usageStats]);
+  }, [activeCategory, usageStats, searchQuery]);
 
   // 今日热推（前 5 名）
   const topRecommendations = useMemo(() => {
@@ -76,7 +87,7 @@ const Home: React.FC = () => {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
           </span>
-          <span>全网累计已生成写真 {Object.values(usageStats).reduce((a, b) => a + b, 0) + 450000}+ 次</span>
+          <span>全网累计已生成写真 {(Object.values(usageStats) as number[]).reduce((a: number, b: number) => a + b, 0) + 450000}+ 次</span>
         </div>
         <h1 className="text-5xl md:text-7xl font-black text-gray-900 tracking-tighter leading-tight">
           定义你的<br/>
@@ -101,29 +112,27 @@ const Home: React.FC = () => {
            <span className="text-xs font-bold text-gray-400">实时热度更新中</span>
         </div>
         
-      <div className="flex overflow-x-auto pb-8 gap-6 px-4 no-scrollbar scroll-smooth">
-  {topRecommendations.map((t, idx) => (
-    <div 
-      key={`top-${t.id}`} 
-      onClick={() => navigate(`/template/${t.id}`)}
-      className="flex-none w-64 md:w-80 group cursor-pointer"
-    >
-      <div className="relative aspect-[3/4] rounded-[2.5rem] overflow-hidden shadow-xl group-hover:shadow-2xl transition-all duration-500">
-        <img src={t.coverImage} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="top" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-        {/* 核心修改：缩小火焰和数字的间距（mr-1 → mr-0） */}
-        <div className="absolute top-3 right-6 w-12 h-12 bg-black/50 backdrop-blur-md rounded-2xl flex items-center justify-center text-white font-black border border-white/30 shadow-lg group-hover:scale-110 transition-all duration-300">
-          <span className="mr-0 text-sm">🔥</span>
-          <span className="italic">{idx + 1}</span>
+        <div className="flex overflow-x-auto pb-8 gap-6 px-4 no-scrollbar scroll-smooth">
+           {topRecommendations.map((t, idx) => (
+             <div 
+               key={`top-${t.id}`} 
+               onClick={() => navigate(`/template/${t.id}`)}
+               className="flex-none w-64 md:w-80 group cursor-pointer"
+             >
+                <div className="relative aspect-[3/4] rounded-[2.5rem] overflow-hidden shadow-xl group-hover:shadow-2xl transition-all duration-500">
+                   <img src={t.coverImage} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="top" />
+                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                   <div className="absolute top-6 left-6 w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-white font-black border border-white/30 italic">
+                      #{idx + 1}
+                   </div>
+                   <div className="absolute bottom-6 left-6 right-6">
+                      <h3 className="text-white font-black text-lg truncate">{t.title}</h3>
+                      <p className="text-white/60 text-[10px] font-bold mt-1 uppercase tracking-widest">{t.usageCount} 人参与创作</p>
+                   </div>
+                </div>
+             </div>
+           ))}
         </div>
-        <div className="absolute bottom-6 left-6 right-6">
-          <h3 className="text-white font-black text-lg truncate">{t.title}</h3>
-          <p className="text-white/60 text-[10px] font-bold mt-1 uppercase tracking-widest">{t.usageCount} 人参与创作</p>
-        </div>
-      </div>
-    </div>
-  ))}
-</div>
       </section>
 
       {/* 旅拍入口卡片 */}
@@ -154,9 +163,9 @@ const Home: React.FC = () => {
          </div>
       </section>
 
-      {/* Category Tabs */}
-      <div id="category-nav" className="sticky top-20 z-40 flex justify-center mb-16 pb-4">
-        <div className="inline-flex p-1.5 bg-gray-200/50 backdrop-blur-xl rounded-[1.5rem] border border-white shadow-xl shadow-gray-200/50">
+      {/* Category Tabs & Search */}
+      <div id="category-nav" className="sticky top-20 z-40 flex flex-col items-center mb-16 space-y-6">
+        <div className="inline-flex p-1.5 bg-gray-200/50 backdrop-blur-xl rounded-[1.5rem] border border-white shadow-xl shadow-gray-200/50 overflow-x-auto max-w-full no-scrollbar">
           {CATEGORIES.map(cat => (
             <button
               key={cat.value}
@@ -172,14 +181,55 @@ const Home: React.FC = () => {
             </button>
           ))}
         </div>
+
+        {/* Search Bar */}
+        <div className="relative w-full max-w-md group">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <svg className="h-5 w-5 text-gray-400 group-focus-within:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            placeholder="搜索模版标题或标签 (如: 汉服, 巴黎, 时尚...)"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="block w-full pl-12 pr-4 py-4 bg-white border-2 border-transparent rounded-2xl text-sm font-medium placeholder-gray-400 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 shadow-lg transition-all"
+          />
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery('')}
+              className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-10 min-h-[800px]">
-        {currentTemplates.map(template => (
-          <TemplateCard key={template.id} template={template} />
-        ))}
-      </div>
+      {currentTemplates.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-10 items-start">
+          {currentTemplates.map(template => (
+            <TemplateCard key={template.id} template={template} />
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-32 space-y-4">
+          <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center text-4xl">
+            🔍
+          </div>
+          <p className="text-gray-500 font-medium">没有找到匹配 "{searchQuery}" 的模版</p>
+          <button 
+            onClick={() => {setSearchQuery(''); setActiveCategory('全部');}}
+            className="text-indigo-600 font-bold hover:underline"
+          >
+            重置搜索条件
+          </button>
+        </div>
+      )}
 
       {/* Pagination Controls */}
       {totalPages > 1 && (

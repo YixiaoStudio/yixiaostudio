@@ -93,6 +93,11 @@ const getCurrentUserId = (): number | null => {
   }
 };
 
+// ========== 新增：获取用户专属的本地存储key ==========
+const getUserUploadHistoryKey = (userId: number | null): string => {
+  return userId ? `ai-upload-history-${userId}` : 'ai-upload-history-guest';
+};
+
 const fetchLatestProfile = async (userId: number): Promise<PointsProfile | null> => {
   const res = await requestPointsApi(userId, '/profile');
   if (res.success) {
@@ -255,10 +260,14 @@ const TemplateDetail: React.FC = () => {
           profileRef.current = latestProfile;
         }
 
+        // 从服务器获取当前用户的上传历史
         const serverHistory = await fetchUserImages(userId);
-        const localHistoryStr = localStorage.getItem('ai-upload-history');
+        // 获取当前用户专属的本地上传历史（关键修改：绑定用户ID）
+        const historyKey = getUserUploadHistoryKey(userId);
+        const localHistoryStr = localStorage.getItem(historyKey);
         const localHistory: UploadHistoryItem[] = localHistoryStr ? JSON.parse(localHistoryStr) : [];
 
+        // 合并并去重
         const combinedHistory = [...serverHistory, ...localHistory].filter(
           (item, index, self) => index === self.findIndex(t => t.tosUrl === item.tosUrl)
         );
@@ -268,9 +277,12 @@ const TemplateDetail: React.FC = () => {
           .slice(0, 10);
 
         setUploadHistory(sortedHistory);
-        localStorage.setItem('ai-upload-history', JSON.stringify(sortedHistory));
+        // 保存到当前用户专属的本地存储
+        localStorage.setItem(historyKey, JSON.stringify(sortedHistory));
       } else {
-        const localHistoryStr = localStorage.getItem('ai-upload-history');
+        // 未登录状态，使用访客模式的存储key
+        const historyKey = getUserUploadHistoryKey(null);
+        const localHistoryStr = localStorage.getItem(historyKey);
         if (localHistoryStr) {
           setUploadHistory(JSON.parse(localHistoryStr));
         }
@@ -296,6 +308,8 @@ const TemplateDetail: React.FC = () => {
   }, []);
 
   const saveUploadHistory = useCallback((file: File, base64Url: string, tosUrl: string) => {
+    const userId = getCurrentUserId();
+    const historyKey = getUserUploadHistoryKey(userId); // 关键修改：绑定用户ID
     const newItem: UploadHistoryItem = {
       id: Date.now().toString(),
       fileName: file.name,
@@ -308,7 +322,8 @@ const TemplateDetail: React.FC = () => {
     const noDuplicateHistory = [newItem, ...uploadHistory.filter(item => item.tosUrl !== tosUrl)];
     const limitedHistory = noDuplicateHistory.slice(0, 10);
     setUploadHistory(limitedHistory);
-    localStorage.setItem('ai-upload-history', JSON.stringify(limitedHistory));
+    // 保存到当前用户专属的本地存储
+    localStorage.setItem(historyKey, JSON.stringify(limitedHistory));
   }, [uploadHistory]);
 
   const selectFromHistory = useCallback((item: UploadHistoryItem) => {
@@ -325,9 +340,12 @@ const TemplateDetail: React.FC = () => {
   const deleteHistoryItem = useCallback((id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (window.confirm('确定要删除这条上传记录吗？')) {
+      const userId = getCurrentUserId();
+      const historyKey = getUserUploadHistoryKey(userId); // 关键修改：绑定用户ID
       const updatedHistory = uploadHistory.filter(item => item.id !== id);
       setUploadHistory(updatedHistory);
-      localStorage.setItem('ai-upload-history', JSON.stringify(updatedHistory));
+      // 更新当前用户专属的本地存储
+      localStorage.setItem(historyKey, JSON.stringify(updatedHistory));
       if (selectedHistoryItem?.id === id) {
         setSelectedHistoryItem(null);
         setPreviewUrl(null);
